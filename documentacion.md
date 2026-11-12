@@ -10,7 +10,7 @@
 
 ## 1. Contexto de la implementación
 
-En este proyecto académico se configuraron servicios básicos de infraestructura sobre Ubuntu Server 24.04 LTS, tomando a Bavaria como contexto organizacional. Las actividades documentadas comprenden la sincronización horaria mediante Chrony, la administración de impresión con CUPS y la generación de documentos mediante la impresora virtual CUPS-PDF.
+En este proyecto académico se configuraron servicios básicos de infraestructura sobre Ubuntu Server 24.04 LTS, tomando a Bavaria como contexto organizacional. Las actividades documentadas comprenden la sincronización horaria mediante Chrony, la administración de impresión con CUPS, la generación de documentos mediante la impresora virtual CUPS-PDF y la compartición centralizada de archivos en red mediante NFS (Network File System).
 
 La implementación se realizó en un entorno de laboratorio. Por tanto, la dirección IP, la subred, los nombres de host y las configuraciones mostradas corresponden a las pruebas realizadas y no describen la infraestructura productiva de Bavaria.
 
@@ -369,27 +369,228 @@ En la evidencia se observa el trabajo `PDF-1` con estado completado. En el direc
 
 ---
 
-## 5. Parámetros técnicos de los servicios
+## 5. Servicio de compartición de archivos NFS (Network File System)
+
+**Objetivo:** proveer un mecanismo centralizado y eficiente de compartición de archivos en red para clientes Linux en el entorno operativo de Bavaria, facilitando la distribución de reportes de producción de plantas, auditorías de calidad y respaldos compartidos entre servidores y terminales de planta.
+
+### 5.1. Instalación del servidor NFS (nfs-kernel-server)
+
+En el servidor Linux se instaló el paquete `nfs-kernel-server` a través del administrador de paquetes APT, el cual incorpora las dependencias requeridas para la operación a nivel de kernel (`nfs-common`, `rpcbind`, `keyutils` y `libnfsidmap1`):
+
+```bash
+sudo apt install nfs-kernel-server -y
+```
+
+Durante el proceso, el sistema configuró e inició los servicios base de mapeo RPC (`rpcbind`), habilitando el entorno necesario para la exportación de sistemas de archivos.
+
+**Evidencia 001. Instalación de nfs-kernel-server en el servidor**
+
+![Instalación de nfs-kernel-server](./capturas/nfs/001-instalacion-nfs-kernel-server.png)
+
+### 5.2. Creación del directorio compartido y configuración de permisos
+
+Siguiendo la directiva de la guía del proyecto, se creó el directorio institucional `/srv/nfs/empresa` destinado a almacenar los archivos operativos de Bavaria:
+
+```bash
+sudo mkdir -p /srv/nfs/empresa
+sudo chown nobody:nogroup /srv/nfs/empresa
+sudo chmod 777 /srv/nfs/empresa
+```
+
+Se asignó la propiedad al usuario y grupo genéricos del sistema (`nobody:nogroup`) y se definieron permisos de lectura, escritura y ejecución totales (`777`) para garantizar que las solicitudes de los clientes de red puedan crear y editar archivos sin bloqueos de permisos a nivel de sistema de archivos local.
+
+**Evidencia 002. Creación del directorio compartido y asignación de permisos**
+
+![Creación del directorio compartido](./capturas/nfs/002-creacion-directorio-compartido.png)
+
+### 5.3. Configuración de la tabla de exportaciones (/etc/exports)
+
+Se configuró el archivo de control de acceso a sistemas de archivos exportados `/etc/exports`:
+
+```bash
+sudo nano /etc/exports
+```
+
+Se definió la regla de exportación para el directorio de la empresa con las directivas especificadas en la guía oficial:
+
+```conf
+/srv/nfs/empresa *(rw,sync,no_root_squash,no_subtree_check)
+```
+
+- **`rw` (read/write):** autoriza tanto operaciones de lectura como de escritura sobre el directorio compartido.
+- **`sync`:** garantiza la integridad de los datos forzando la sincronización de las operaciones de escritura en disco antes de confirmar la solicitud al cliente.
+- **`no_root_squash`:** permite que el usuario root del cliente conserve privilegios administrativos al interactuar con el recurso remoto.
+- **`no_subtree_check`:** optimiza la transferencia de archivos al desactivar la comprobación de subárboles en el sistema de archivos exportado.
+
+**Evidencia 003. Edición y contenido del archivo /etc/exports**
+
+![Edición de /etc/exports](./capturas/nfs/003-edicion-configuracion-exports.png)
+
+### 5.4. Aplicación de las reglas de exportación e inicio del servicio
+
+Se aplicaron las directivas configuradas sin requerir el reinicio completo del sistema y se habilitó el servicio para iniciar automáticamente con el sistema operativo:
+
+```bash
+sudo exportfs -ra
+sudo systemctl enable --now nfs-kernel-server
+```
+
+El comando `exportfs -ra` lee nuevamente el archivo `/etc/exports` y actualiza la tabla del kernel en tiempo real.
+
+**Evidencia 004. Aplicación de exportfs y habilitación de nfs-kernel-server**
+
+![Aplicación de exportfs y servicio](./capturas/nfs/004-aplicacion-exportfs-y-servicio.png)
+
+### 5.5. Verificación del estado del servicio, tabla exportfs y puertos de red
+
+Se comprobó la correcta operatividad del daemon NFS y la apertura de los puertos correspondientes:
+
+```bash
+sudo exportfs -v
+sudo systemctl status nfs-kernel-server --no-pager
+sudo ss -tulpn | grep -E '2049|111'
+```
+
+La salida confirmó que el recurso `/srv/nfs/empresa` se encuentra activamente exportado con los atributos de seguridad y sincronización establecidos. En la inspección de sockets se verificó que el servicio NFS escucha en el puerto TCP/UDP `2049`, mientras que `rpcbind` gestiona las llamadas en el puerto `111`.
+
+**Evidencia 005. Verificación de exportfs, estado activo del servicio y puertos de red**
+
+![Verificación de servicio y puertos NFS](./capturas/nfs/005-verificacion-servicio-y-puertos-nfs.png)
+
+### 5.6. Instalación de utilidades NFS en el cliente Linux (nfs-common)
+
+En el equipo cliente (nodo representativo de terminal o estación de trabajo de Bavaria) se instaló el paquete de cliente NFS:
+
+```bash
+sudo apt install nfs-common -y
+```
+
+El paquete suministra el programa `mount.nfs` y los daemons asociados para la negociación de versiones de protocolo (NFSv4/NFSv3) y bloqueo de archivos.
+
+**Evidencia 006. Instalación de nfs-common en el cliente Linux**
+
+![Instalación de nfs-common en cliente](./capturas/nfs/006-instalacion-nfs-common-cliente.png)
+
+### 5.7. Creación del punto de montaje local en el cliente
+
+Se creó el directorio local donde se mapeará el recurso compartido del servidor:
+
+```bash
+sudo mkdir -p /mnt/empresa
+```
+
+**Evidencia 007. Creación del punto de montaje en el cliente**
+
+![Creación del punto de montaje](./capturas/nfs/007-creacion-punto-montaje-cliente.png)
+
+### 5.8. Montaje remoto del recurso compartido NFS
+
+Se procedió a montar el recurso compartido desde la dirección IP del servidor NFS hacia el punto de montaje local:
+
+```bash
+sudo mount -t nfs 172.30.13.148:/srv/nfs/empresa /mnt/empresa
+```
+
+La orden se ejecutó limpiamente sin errores ni mensajes de advertencia, estableciendo el túnel de comunicación a través del protocolo NFSv4.
+
+**Evidencia 008. Ejecución del comando de montaje remoto NFS**
+
+![Montaje del recurso NFS](./capturas/nfs/008-montaje-recurso-nfs.png)
+
+### 5.9. Verificación del sistema de archivos montado
+
+Se verificó el estado de montaje y el espacio disponible utilizando las herramientas de administración de almacenamiento:
+
+```bash
+df -hT /mnt/empresa
+mount | grep nfs
+```
+
+La herramienta `df -hT` reconoció el sistema de archivos remoto de tipo `nfs4` con capacidad disponible idéntica a la partición del servidor. Asimismo, el comando `mount` confirmó los parámetros de montaje activo: versión del protocolo (`vers=4.2`), transporte TCP (`proto=tcp`) y permisos de lectura/escritura (`rw`).
+
+**Evidencia 009. Verificación del montaje con df y mount**
+
+![Verificación de montaje con df y mount](./capturas/nfs/009-verificacion-montaje-df-mount.png)
+
+### 5.10. Prueba de escritura y persistencia desde el cliente
+
+Para validar el criterio de éxito del servicio ("compartición funcional y permisos correctos"), se generó un archivo operativo del contexto de Bavaria desde la estación cliente:
+
+```bash
+echo 'Bavaria S.A. - Control de Operaciones y Procesos' > /mnt/empresa/reporte_lote_bavaria.txt
+echo 'Planta: Cerveceria de Tocancipa | Lote #4092 - Aguila Original' >> /mnt/empresa/reporte_lote_bavaria.txt
+echo 'Fecha: 2026-11-12 | Estado: Fermentacion Optima' >> /mnt/empresa/reporte_lote_bavaria.txt
+ls -la /mnt/empresa
+cat /mnt/empresa/reporte_lote_bavaria.txt
+```
+
+La creación y escritura del archivo `reporte_lote_bavaria.txt` se completó de manera inmediata, confirmando que el cliente posee permisos de modificación sobre el recurso remoto.
+
+**Evidencia 010. Prueba de creación y escritura de archivos desde el cliente**
+
+![Prueba de escritura desde el cliente](./capturas/nfs/010-prueba-escritura-desde-cliente.png)
+
+### 5.11. Verificación de archivos compartidos en el servidor
+
+Desde la sesión en el servidor NFS se consultó el contenido del directorio `/srv/nfs/empresa` para comprobar la persistencia física del archivo generado remotamente:
+
+```bash
+ls -la /srv/nfs/empresa
+cat /srv/nfs/empresa/reporte_lote_bavaria.txt
+```
+
+El servidor reflejó de inmediato el archivo `reporte_lote_bavaria.txt`, su longitud en bytes y su contenido íntegro, confirmando la sincronización en tiempo real entre los dos nodos de red.
+
+**Evidencia 011. Comprobación de persistencia y lectura en el servidor**
+
+![Verificación de archivos en servidor](./capturas/nfs/011-verificacion-archivos-en-servidor.png)
+
+### 5.12. Prueba de flujo bidireccional y control de concurrencia
+
+Se verificó el flujo inverso creando una directiva de control de calidad desde el servidor y validando su lectura y modificación concurrente desde el cliente:
+
+```bash
+# En el servidor:
+echo 'Bavaria S.A. - Direccion Nacional de Calidad e Inocuidad' | sudo tee /srv/nfs/empresa/calidad_tocancipa.txt
+echo 'Directriz: Auditoria de inocuidad en lineas de embotellado aprobada.' | sudo tee -a /srv/nfs/empresa/calidad_tocancipa.txt
+
+# En el cliente:
+cat /mnt/empresa/calidad_tocancipa.txt
+echo '[CONFORMIDAD] Lote #4092 verificado por supervisor de turno Planta Tocancipa.' >> /mnt/empresa/calidad_tocancipa.txt
+cat /mnt/empresa/calidad_tocancipa.txt
+```
+
+El cliente accedió al documento generado por el servidor y anexó la constancia de conformidad operativa sin contratiempos, validando la integridad transaccional del servicio NFS bajo el entorno simulado de Bavaria.
+
+**Evidencia 012. Verificación de flujo bidireccional y edición concurrente**
+
+![Prueba bidireccional y permisos](./capturas/nfs/012-prueba-bidireccional-y-permisos.png)
+
+---
+
+## 6. Parámetros técnicos de los servicios
 
 | Servicio | Dirección / recurso | Puerto | Protocolo | Función |
 |---|---|---:|---|---|
 | Chrony / NTP | `192.168.18.87` | 123 | UDP | Sincronización y consulta de hora. |
 | CUPS | `192.168.18.87` | 631 | TCP | Interfaz web, administración y recepción de trabajos de impresión. |
 | CUPS-PDF | Cola virtual `PDF` | — | CUPS | Conversión de trabajos de impresión a archivos PDF. |
+| NFS Server | `/srv/nfs/empresa` | 2049 / 111 | TCP / UDP | Compartición centralizada de archivos para clientes Linux de Bavaria. |
 
 La dirección IP y la subred corresponden exclusivamente al entorno de laboratorio utilizado en las pruebas.
 
-## 6. Resultados de la implementación
+## 7. Resultados de la implementación
 
-La implementación permitió configurar y verificar dos servicios principales de infraestructura:
+La implementación permitió configurar y verificar los servicios principales de infraestructura requeridos:
 
 - **Chrony:** se instaló y habilitó el servicio, se revisaron sus fuentes de tiempo y su estado de sincronización, se autorizó la subred de laboratorio y se realizó una consulta desde un cliente Windows. Las evidencias muestran que el servidor respondió a las solicitudes de consulta horaria.
 - **CUPS:** se verificó el servicio, se ajustó su configuración para permitir el acceso desde la red local, se comprobó la disponibilidad de la interfaz web y se accedió al panel de administración.
 - **CUPS-PDF:** se instaló el controlador de impresión virtual, se envió un documento de prueba a la cola `PDF` y se verificó la finalización del trabajo y la generación del archivo PDF.
+- **NFS (Network File System):** se instaló y habilitó `nfs-kernel-server`, se exportó el directorio corporativo `/srv/nfs/empresa` con parámetros `(rw,sync,no_root_squash)`, se ejecutó el montaje exitoso desde un cliente Linux con `nfs-common` en `/mnt/empresa` y se validó la persistencia y control de concurrencia de lectura y escritura para reportes y auditorías de Bavaria.
 
 Los resultados corresponden al entorno académico de laboratorio. No se afirma que estos servicios estén desplegados en la infraestructura productiva de Bavaria ni que la organización utilice el direccionamiento presentado.
 
-## 7. Archivos y evidencias del repositorio
+## 8. Archivos y evidencias del repositorio
 
 La documentación se apoya en la siguiente organización de archivos:
 
@@ -398,15 +599,18 @@ La documentación se apoya en la siguiente organización de archivos:
 | `documentacion.md` | Procedimientos de instalación, configuración y verificación de los servicios. |
 | `capturas/ntp/` | Evidencias de instalación, configuración y pruebas de Chrony. |
 | `capturas/cups/` | Evidencias de configuración, acceso y administración de CUPS. |
+| `capturas/nfs/` | Evidencias de instalación, configuración, montaje y pruebas de permisos de NFS. |
 | `codigo/chrony.conf` | Archivo de configuración de Chrony utilizado como referencia del proyecto. |
 | `codigo/cupsd.conf` | Archivo de configuración de CUPS documentado para el laboratorio. |
 | `codigo/cups-pdf.conf` | Archivo relacionado con la configuración de CUPS-PDF, si se conserva en el repositorio. |
+| `codigo/nfs/exports` | Archivo de configuración oficial de exportación NFS documentado para el laboratorio. |
 | `README.md` | Presentación general y alcance del proyecto. |
 | `analisis.md` | Contexto, necesidades consideradas y diseño de los servicios. |
 
-## 8. Consideraciones de seguridad y alcance
+## 9. Consideraciones de seguridad y alcance
 
 - La regla `allow 192.168.18.0/24` de Chrony y las reglas `Allow from 192.168.18.0/24` de CUPS corresponden a la red de laboratorio. Deben ajustarse antes de reutilizar la configuración en otra red.
+- En NFS, la directiva `no_root_squash` se empleó según los requisitos de la guía académica para simplificar pruebas de laboratorio; en una red productiva de Bavaria debe utilizarse `root_squash` y mapeo restringido (`anonuid`/`anongid`) para prevenir elevación de privilegios no autorizada.
 - El acceso a la interfaz web de CUPS no implica que todas las operaciones administrativas estén abiertas. Las acciones de administración deben conservar autenticación y autorización.
 - La advertencia del navegador sobre el certificado HTTPS debe resolverse mediante un certificado confiable si el servicio se utiliza en un entorno real.
 - CUPS-PDF es una impresora virtual y no sustituye la validación de una impresora física.
