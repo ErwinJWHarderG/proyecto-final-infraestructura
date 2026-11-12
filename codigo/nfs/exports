@@ -1,0 +1,3 @@
+# /etc/exports - Configuracion de exportacion NFS para Bavaria
+# Directorio compartido para intercambio de reportes de planta, auditorias y control de calidad
+/srv/nfs/empresa *(rw,sync,no_root_squash,no_subtree_check)

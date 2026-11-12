@@ -4,7 +4,7 @@
 
 Este proyecto académico aborda la configuración de servicios de infraestructura de TI tomando como contexto organizacional a **Bavaria**, empresa del sector de bebidas. El propósito es documentar una solución de laboratorio basada en Ubuntu Server 24.04 LTS que permita centralizar servicios de red y apoyar tareas de administración tecnológica.
 
-La implementación documentada comprende la sincronización de tiempo mediante Chrony y la gestión de impresión mediante CUPS, incluyendo CUPS-PDF para realizar pruebas de impresión simulada en formato PDF.
+La implementación documentada comprende la sincronización de tiempo mediante Chrony, la gestión de impresión mediante CUPS (incluyendo CUPS-PDF para pruebas de impresión simulada) y el almacenamiento compartido en red mediante NFS.
 
 > **Alcance:** La configuración se realizó en un entorno de laboratorio. Este repositorio no afirma que los servicios estén desplegados en la infraestructura productiva de Bavaria.
 
@@ -31,6 +31,10 @@ CUPS centraliza la administración de impresoras y trabajos de impresión desde 
 
 Se instaló el controlador `printer-driver-cups-pdf` y se utilizó la cola virtual `PDF` para comprobar el envío y procesamiento de trabajos de impresión sin requerir una impresora física. La prueba generó un archivo PDF en el directorio de salida del servicio.
 
+### D. Servicio de almacenamiento compartido NFS
+
+NFS (Network File System) permite centralizar y compartir directorios en red para el acceso concurrente de estaciones y servidores Linux de Bavaria. Se configuró el recurso institucional `/srv/nfs/empresa` con permisos de lectura y escritura (`rw`), sincronización inmediata (`sync`) y montaje verificado en cliente Linux en `/mnt/empresa`, facilitando el intercambio de reportes de planta, auditorías de calidad y respaldos.
+
 ## 4. Estructura del repositorio
 
 | Archivo o directorio | Descripción |
@@ -48,6 +52,8 @@ Se instaló el controlador `printer-driver-cups-pdf` y se utilizó la cola virtu
 | :--- | :---: | :--- | :--- |
 | Chrony / NTP | 123 | UDP | Sincronización y consulta de hora. |
 | CUPS | 631 | TCP | Administración y recepción de trabajos de impresión. |
+| NFS | 2049 | TCP / UDP | Compartición de archivos en red para clientes Linux. |
+| RPCbind | 111 | TCP / UDP | Mapeo y resolución de puertos para llamadas RPC en NFS. |
 
 ## 6. Consideraciones
 
