@@ -572,7 +572,19 @@ El cliente accedió al documento generado por el servidor y anexó la constancia
 
 **Objetivo:** centralizar las cuentas de usuario y grupos de una red de laboratorio para que los clientes Linux puedan consultar y autenticar usuarios administrados en un servidor NIS.
 
-### 6.1. Arquitectura y parámetros
+### 6.1. Justificación para Bavaria
+
+Tomando como escenario una empresa cervecera como Bavaria, con áreas diferenciadas (producción, logística y calidad) que comparten equipos Linux, administrar cuentas equipo por equipo genera tres problemas: duplicidad de trabajo, inconsistencias (el mismo usuario con UID o contraseña distintos según el equipo) y cuentas que permanecen activas cuando una persona se retira o cambia de área.
+
+Con NIS, las cuentas y los grupos se administran en un solo servidor y se distribuyen a los clientes. Las altas, bajas y cambios de contraseña se realizan en un único punto, y los grupos permiten reflejar la estructura por áreas de la organización. En el laboratorio se modelaron los siguientes grupos y usuarios:
+
+| Grupo | GID | Usuario | UID | Área representada |
+|---|---:|---|---:|---|
+| `produccion` | 2001 | `operario1` | 2001 | Operario de planta |
+| `logistica` | 2002 | `supervisor1` | 2003 | Supervisor de logística |
+| `calidad` | 2003 | `analista1` | 2002 | Analista de calidad |
+
+### 6.2. Arquitectura y parámetros
 
 En el laboratorio se configuró un servidor maestro `nis-server` y un cliente `nis-client`, dentro del dominio NIS `bavaria.local`.
 
@@ -588,7 +600,7 @@ En el laboratorio se configuró un servidor maestro `nis-server` y un cliente `n
 
 El servidor genera mapas NIS a partir de las cuentas y grupos configurados localmente. El cliente consulta esos mapas cuando necesita resolver usuarios que no están definidos en sus archivos locales.
 
-### 6.2. Preparación de red
+### 6.3. Preparación de red
 
 Ambas máquinas virtuales se configuraron con red *bridged*, direcciones IP estáticas y nombres de host diferenciados. La configuración de Netplan se encuentra en `/etc/netplan/00-installer-config.yaml` (no `50-cloud-init.yaml`):
 
@@ -623,17 +635,17 @@ Se eliminó la entrada predeterminada `127.0.1.1` para evitar que el servidor se
 
 ![IP y hostname](./capturas/nis/01_ip_hostname.png)
 
-### 6.3. Configuración del servidor
+### 6.4. Configuración del servidor
 
 Se instalaron los paquetes y se definió `bavaria.local` en `/etc/defaultdomain`. En `/etc/ypserv.securenets` se deshabilitaron las reglas de acceso universal y se autorizó la red del laboratorio con `255.255.255.0 192.168.1.0`. En `/var/yp/Makefile`, `MINUID` y `MINGID` se ajustaron a `2000`; las opciones `MERGE_PASSWD` y `MERGE_GROUP` permiten incluir la información necesaria en los mapas.
 
-Se crearon los siguientes grupos y usuarios de prueba:
+De acuerdo con el modelo de usuarios y grupos presentado en el apartado 6.1, en el servidor se configuraron las siguientes cuentas:
 
-| Grupo | GID | Usuario | UID |
-|---|---:|---|---:|
-| `produccion` | 2001 | `operario1` | 2001 |
-| `logistica` | 2002 | `supervisor1` | 2003 |
-| `calidad` | 2003 | `analista1` | 2002 |
+| Grupo | GID | Usuario | UID | Área representada |
+|---|---:|---|---:|---|
+| `produccion` | 2001 | `operario1` | 2001 | Operario de planta |
+| `logistica` | 2002 | `supervisor1` | 2003 | Supervisor de logística |
+| `calidad` | 2003 | `analista1` | 2002 | Analista de calidad |
 
 Se inicializaron los mapas con `sudo /usr/lib/yp/ypinit -m` y se habilitaron `rpcbind`, `ypserv`, `ypbind` y `yppasswdd`. La consulta con `ypwhich` y `ypcat` confirmó el servidor y los mapas publicados; la cuenta administradora local no se publica.
 
@@ -665,7 +677,7 @@ Se inicializaron los mapas con `sudo /usr/lib/yp/ypinit -m` y se habilitaron `rp
 
 ![Verificación de mapas del servidor](./capturas/nis/08_verificacion_servidor.png)
 
-### 6.4. Configuración y verificación del cliente
+### 6.5. Configuración y verificación del cliente
 
 En el cliente se instalaron `nis` y `rpcbind`, se estableció el mismo dominio en `/etc/defaultdomain` y se indicó el servidor en `/etc/yp.conf`:
 
@@ -689,7 +701,7 @@ La conectividad y la resolución se comprobaron con `ypwhich`, `ypcat passwd`, `
 
 ![Verificación del cliente NIS](./capturas/nis/11_verificacion_cliente.png)
 
-### 6.5. Pruebas de autenticación y propagación
+### 6.6. Pruebas de autenticación y propagación
 
 Se verificó el inicio de sesión local con `su - operario1` y el acceso remoto por SSH con `analista1`. En ambos casos se comprobó la identidad del usuario y la creación automática de su directorio personal.
 
