@@ -615,7 +615,13 @@ Se establecieron los nombres `nis-server` y `nis-client`, y se agregaron las res
 
 Se eliminó la entrada predeterminada `127.0.1.1` para evitar que el servidor se anunciara con una dirección local inaccesible desde el cliente. La conectividad se verificó con `ip -br a`, `hostname -f`, `getent hosts nis-server` y `ping -c 3 nis-server`.
 
-**Evidencias NIS-00 y NIS-01.** [Resolución en `/etc/hosts`](./capturas/nis/00_archivo_hosts.png) y [dirección IP y nombre de host](./capturas/nis/01_ip_hostname.png).
+**Evidencia NIS-00. Resolución de nombres en `/etc/hosts`**
+
+![Archivo hosts](./capturas/nis/00_archivo_hosts.png)
+
+**Evidencia NIS-01. Dirección IP y nombre de host**
+
+![IP y hostname](./capturas/nis/01_ip_hostname.png)
 
 ### 6.3. Configuración del servidor
 
@@ -631,7 +637,33 @@ Se crearon los siguientes grupos y usuarios de prueba:
 
 Se inicializaron los mapas con `sudo /usr/lib/yp/ypinit -m` y se habilitaron `rpcbind`, `ypserv`, `ypbind` y `yppasswdd`. La consulta con `ypwhich` y `ypcat` confirmó el servidor y los mapas publicados; la cuenta administradora local no se publica.
 
-**Evidencias NIS-02 a NIS-08.** [Instalación](./capturas/nis/02_instalacion_nis.png), [restricción de acceso](./capturas/nis/03_securenets.png), [parámetros del Makefile](./capturas/nis/04_makefile.png), [usuarios](./capturas/nis/05_usuarios_locales.png), [inicialización de mapas](./capturas/nis/06_ypinit.png), [servicios activos](./capturas/nis/07_servicios_activos.png) y [verificación de mapas](./capturas/nis/08_verificacion_servidor.png).
+**Evidencia NIS-02. Instalación de NIS**
+
+![Instalación de NIS](./capturas/nis/02_instalacion_nis.png)
+
+**Evidencia NIS-03. Dominio NIS y restricción de acceso**
+
+![Dominio NIS y securenets](./capturas/nis/03_securenets.png)
+
+**Evidencia NIS-04. Parámetros del Makefile**
+
+![Makefile de NIS](./capturas/nis/04_makefile.png)
+
+**Evidencia NIS-05. Usuarios creados en el servidor**
+
+![Usuarios locales del servidor](./capturas/nis/05_usuarios_locales.png)
+
+**Evidencia NIS-06. Inicialización de los mapas**
+
+![Inicialización con ypinit](./capturas/nis/06_ypinit.png)
+
+**Evidencia NIS-07. Servicios NIS activos**
+
+![Servicios NIS activos](./capturas/nis/07_servicios_activos.png)
+
+**Evidencia NIS-08. Verificación de los mapas en el servidor**
+
+![Verificación de mapas del servidor](./capturas/nis/08_verificacion_servidor.png)
 
 ### 6.4. Configuración y verificación del cliente
 
@@ -645,7 +677,17 @@ Se agregó `nis` al final de las entradas correspondientes a `passwd`, `group`, 
 
 La conectividad y la resolución se comprobaron con `ypwhich`, `ypcat passwd`, `getent passwd operario1` e `id operario1`. El cliente obtuvo los datos del usuario y grupo desde el servidor sin tener una cuenta local equivalente.
 
-**Evidencias NIS-09 a NIS-11.** [Conectividad](./capturas/nis/09_cliente_ping_servidor.png), [configuración de NSS](./capturas/nis/10_nsswitch.png) y [verificación del cliente](./capturas/nis/11_verificacion_cliente.png).
+**Evidencia NIS-09. Conectividad del cliente con el servidor**
+
+![Conectividad NIS](./capturas/nis/09_cliente_ping_servidor.png)
+
+**Evidencia NIS-10. Dominio y configuración NSS del cliente**
+
+![Configuración NSS del cliente](./capturas/nis/10_nsswitch.png)
+
+**Evidencia NIS-11. Verificación de NIS en el cliente**
+
+![Verificación del cliente NIS](./capturas/nis/11_verificacion_cliente.png)
 
 ### 6.5. Pruebas de autenticación y propagación
 
@@ -653,7 +695,17 @@ Se verificó el inicio de sesión local con `su - operario1` y el acceso remoto 
 
 También se creó en el servidor un usuario de prueba adicional y se regeneraron los mapas con `cd /var/yp && sudo make`. El cliente reconoció el nuevo usuario mediante `id` sin crear una cuenta local.
 
-**Evidencias NIS-12a y NIS-12b.** [Inicio de sesión local](./capturas/nis/12a_login_nis.png) y [acceso SSH](./capturas/nis/12b_login_ssh.png). **Evidencia NIS-13.** [Propagación de un usuario](./capturas/nis/13_propagacion.png).
+**Evidencia NIS-12a. Inicio de sesión local con un usuario NIS**
+
+![Inicio de sesión NIS](./capturas/nis/12a_login_nis.png)
+
+**Evidencia NIS-12b. Acceso SSH con un usuario NIS**
+
+![Acceso SSH con NIS](./capturas/nis/12b_login_ssh.png)
+
+**Evidencia NIS-13. Propagación de un usuario nuevo al cliente**
+
+![Propagación de usuario NIS](./capturas/nis/13_propagacion.png)
 
 ---
 
