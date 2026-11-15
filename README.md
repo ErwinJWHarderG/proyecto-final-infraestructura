@@ -4,7 +4,7 @@
 
 Este proyecto académico aborda la configuración de servicios de infraestructura de TI tomando como contexto organizacional a **Bavaria**, empresa del sector de bebidas. El propósito es documentar una solución de laboratorio basada en Ubuntu Server 24.04 LTS que permita centralizar servicios de red y apoyar tareas de administración tecnológica.
 
-La implementación documentada comprende la sincronización de tiempo mediante Chrony, la gestión de impresión mediante CUPS (incluyendo CUPS-PDF para pruebas de impresión simulada) y el almacenamiento compartido en red mediante NFS.
+La implementación documentada comprende la sincronización de tiempo mediante Chrony, la gestión de impresión mediante CUPS (incluyendo CUPS-PDF para pruebas de impresión simulada), el almacenamiento compartido en red mediante NFS y la autenticación centralizada de usuarios mediante NIS.
 
 > **Alcance:** La configuración se realizó en un entorno de laboratorio. Este repositorio no afirma que los servicios estén desplegados en la infraestructura productiva de Bavaria.
 
@@ -35,6 +35,10 @@ Se instaló el controlador `printer-driver-cups-pdf` y se utilizó la cola virtu
 
 NFS (Network File System) permite centralizar y compartir directorios en red para el acceso concurrente de estaciones y servidores Linux de Bavaria. Se configuró el recurso institucional `/srv/nfs/empresa` con permisos de lectura y escritura (`rw`), sincronización inmediata (`sync`) y montaje verificado en cliente Linux en `/mnt/empresa`, facilitando el intercambio de reportes de planta, auditorías de calidad y respaldos.
 
+### E. Autenticación centralizada con NIS
+
+NIS (Network Information Service) centraliza la consulta de usuarios y grupos para equipos Linux. En el laboratorio se configuró el servidor maestro `nis-server` (`192.168.1.54`) y el cliente `nis-client` (`192.168.1.55`) en el dominio `bavaria.local`; se verificó la autenticación local y por SSH, así como la propagación de usuarios nuevos. NIS transmite información sin cifrar y se documenta únicamente para el entorno académico de pruebas.
+
 ## 4. Estructura del repositorio
 
 | Archivo o directorio | Descripción |
@@ -53,11 +57,13 @@ NFS (Network File System) permite centralizar y compartir directorios en red par
 | Chrony / NTP | 123 | UDP | Sincronización y consulta de hora. |
 | CUPS | 631 | TCP | Administración y recepción de trabajos de impresión. |
 | NFS | 2049 | TCP / UDP | Compartición de archivos en red para clientes Linux. |
-| RPCbind | 111 | TCP / UDP | Mapeo y resolución de puertos para llamadas RPC en NFS. |
+| NIS | 111 y puertos RPC dinámicos | TCP / UDP | Consulta centralizada de usuarios y grupos en clientes Linux. |
+| RPCbind | 111 | TCP / UDP | Mapeo y resolución de puertos para llamadas RPC de NFS y NIS. |
 
 ## 6. Consideraciones
 
 - La dirección IP y la subred corresponden al entorno de laboratorio utilizado durante las pruebas.
+- NIS se probó en máquinas virtuales con direccionamiento distinto al de los demás servicios. No debe exponerse a redes no confiables, ya que sus consultas no están cifradas.
 - La cola `PDF` es una impresora virtual; no representa la instalación de una impresora física en Bavaria.
 - Las evidencias del repositorio respaldan los procedimientos realizados en el laboratorio.
 - Antes de trasladar esta configuración a un entorno productivo, se deben validar el direccionamiento, las políticas de acceso, la seguridad y los requerimientos reales de la organización.

@@ -10,7 +10,7 @@
 
 ## 1. Contexto de la implementación
 
-En este proyecto académico se configuraron servicios básicos de infraestructura sobre Ubuntu Server 24.04 LTS, tomando a Bavaria como contexto organizacional. Las actividades documentadas comprenden la sincronización horaria mediante Chrony, la administración de impresión con CUPS, la generación de documentos mediante la impresora virtual CUPS-PDF y la compartición centralizada de archivos en red mediante NFS (Network File System).
+En este proyecto académico se configuraron servicios básicos de infraestructura sobre Ubuntu Server 24.04 LTS, tomando a Bavaria como contexto organizacional. Las actividades documentadas comprenden la sincronización horaria mediante Chrony, la administración de impresión con CUPS, la generación de documentos mediante la impresora virtual CUPS-PDF, la compartición centralizada de archivos mediante NFS y la autenticación centralizada de usuarios mediante NIS.
 
 La implementación se realizó en un entorno de laboratorio. Por tanto, la dirección IP, la subred, los nombres de host y las configuraciones mostradas corresponden a las pruebas realizadas y no describen la infraestructura productiva de Bavaria.
 
@@ -568,7 +568,96 @@ El cliente accedió al documento generado por el servidor y anexó la constancia
 
 ---
 
-## 6. Parámetros técnicos de los servicios
+## 6. Servicio de autenticación centralizada NIS
+
+**Objetivo:** centralizar las cuentas de usuario y grupos de una red de laboratorio para que los clientes Linux puedan consultar y autenticar usuarios administrados en un servidor NIS.
+
+### 6.1. Arquitectura y parámetros
+
+En el laboratorio se configuró un servidor maestro `nis-server` y un cliente `nis-client`, dentro del dominio NIS `bavaria.local`.
+
+| Parámetro | Valor |
+|---|---|
+| Sistema operativo | Ubuntu Server 26.04.1 LTS |
+| Dominio NIS | `bavaria.local` |
+| Servidor maestro | `nis-server` – `192.168.1.54` |
+| Cliente | `nis-client` – `192.168.1.55` |
+| Red autorizada | `192.168.1.0/24` |
+| Paquetes | `nis`, `rpcbind` |
+| Puertos | `111` TCP/UDP (rpcbind) y puertos RPC dinámicos de NIS |
+
+El servidor genera mapas NIS a partir de las cuentas y grupos configurados localmente. El cliente consulta esos mapas cuando necesita resolver usuarios que no están definidos en sus archivos locales.
+
+### 6.2. Preparación de red
+
+Ambas máquinas virtuales se configuraron con red *bridged*, direcciones IP estáticas y nombres de host diferenciados. La configuración de Netplan se encuentra en `/etc/netplan/00-installer-config.yaml` (no `50-cloud-init.yaml`):
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: false
+      addresses: [192.168.1.54/24] # En el cliente: 192.168.1.55/24
+      routes:
+        - to: default
+          via: 192.168.1.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
+```
+
+Se establecieron los nombres `nis-server` y `nis-client`, y se agregaron las resoluciones locales en `/etc/hosts`:
+
+```text
+192.168.1.54  nis-server.bavaria.local  nis-server
+192.168.1.55  nis-client.bavaria.local  nis-client
+```
+
+Se eliminó la entrada predeterminada `127.0.1.1` para evitar que el servidor se anunciara con una dirección local inaccesible desde el cliente. La conectividad se verificó con `ip -br a`, `hostname -f`, `getent hosts nis-server` y `ping -c 3 nis-server`.
+
+**Evidencias NIS-00 y NIS-01.** [Resolución en `/etc/hosts`](./capturas/nis/00_archivo_hosts.png) y [dirección IP y nombre de host](./capturas/nis/01_ip_hostname.png).
+
+### 6.3. Configuración del servidor
+
+Se instalaron los paquetes y se definió `bavaria.local` en `/etc/defaultdomain`. En `/etc/ypserv.securenets` se deshabilitaron las reglas de acceso universal y se autorizó la red del laboratorio con `255.255.255.0 192.168.1.0`. En `/var/yp/Makefile`, `MINUID` y `MINGID` se ajustaron a `2000`; las opciones `MERGE_PASSWD` y `MERGE_GROUP` permiten incluir la información necesaria en los mapas.
+
+Se crearon los siguientes grupos y usuarios de prueba:
+
+| Grupo | GID | Usuario | UID |
+|---|---:|---|---:|
+| `produccion` | 2001 | `operario1` | 2001 |
+| `logistica` | 2002 | `supervisor1` | 2003 |
+| `calidad` | 2003 | `analista1` | 2002 |
+
+Se inicializaron los mapas con `sudo /usr/lib/yp/ypinit -m` y se habilitaron `rpcbind`, `ypserv`, `ypbind` y `yppasswdd`. La consulta con `ypwhich` y `ypcat` confirmó el servidor y los mapas publicados; la cuenta administradora local no se publica.
+
+**Evidencias NIS-02 a NIS-08.** [Instalación](./capturas/nis/02_instalacion_nis.png), [restricción de acceso](./capturas/nis/03_securenets.png), [parámetros del Makefile](./capturas/nis/04_makefile.png), [usuarios](./capturas/nis/05_usuarios_locales.png), [inicialización de mapas](./capturas/nis/06_ypinit.png), [servicios activos](./capturas/nis/07_servicios_activos.png) y [verificación de mapas](./capturas/nis/08_verificacion_servidor.png).
+
+### 6.4. Configuración y verificación del cliente
+
+En el cliente se instalaron `nis` y `rpcbind`, se estableció el mismo dominio en `/etc/defaultdomain` y se indicó el servidor en `/etc/yp.conf`:
+
+```text
+domain bavaria.local server 192.168.1.54
+```
+
+Se agregó `nis` al final de las entradas correspondientes a `passwd`, `group`, `shadow` y `gshadow` en `/etc/nsswitch.conf`, de modo que primero se consulten las cuentas locales. Se habilitó `mkhomedir` para crear el directorio personal durante el primer inicio de sesión y se inició `ypbind`.
+
+La conectividad y la resolución se comprobaron con `ypwhich`, `ypcat passwd`, `getent passwd operario1` e `id operario1`. El cliente obtuvo los datos del usuario y grupo desde el servidor sin tener una cuenta local equivalente.
+
+**Evidencias NIS-09 a NIS-11.** [Conectividad](./capturas/nis/09_cliente_ping_servidor.png), [configuración de NSS](./capturas/nis/10_nsswitch.png) y [verificación del cliente](./capturas/nis/11_verificacion_cliente.png).
+
+### 6.5. Pruebas de autenticación y propagación
+
+Se verificó el inicio de sesión local con `su - operario1` y el acceso remoto por SSH con `analista1`. En ambos casos se comprobó la identidad del usuario y la creación automática de su directorio personal.
+
+También se creó en el servidor un usuario de prueba adicional y se regeneraron los mapas con `cd /var/yp && sudo make`. El cliente reconoció el nuevo usuario mediante `id` sin crear una cuenta local.
+
+**Evidencias NIS-12a y NIS-12b.** [Inicio de sesión local](./capturas/nis/12a_login_nis.png) y [acceso SSH](./capturas/nis/12b_login_ssh.png). **Evidencia NIS-13.** [Propagación de un usuario](./capturas/nis/13_propagacion.png).
+
+---
+
+## 7. Parámetros técnicos de los servicios
 
 | Servicio | Dirección / recurso | Puerto | Protocolo | Función |
 |---|---|---:|---|---|
@@ -576,10 +665,11 @@ El cliente accedió al documento generado por el servidor y anexó la constancia
 | CUPS | `192.168.18.87` | 631 | TCP | Interfaz web, administración y recepción de trabajos de impresión. |
 | CUPS-PDF | Cola virtual `PDF` | — | CUPS | Conversión de trabajos de impresión a archivos PDF. |
 | NFS Server | `/srv/nfs/empresa` | 2049 / 111 | TCP / UDP | Compartición centralizada de archivos para clientes Linux de Bavaria. |
+| NIS | `bavaria.local` (`192.168.1.54` / `192.168.1.55`) | 111 y RPC dinámicos | TCP / UDP | Consulta centralizada de usuarios y grupos desde clientes Linux. |
 
-La dirección IP y la subred corresponden exclusivamente al entorno de laboratorio utilizado en las pruebas.
+Las direcciones IP y subredes corresponden exclusivamente a los entornos de laboratorio utilizados en las pruebas; NIS se probó en máquinas virtuales con direccionamiento distinto al de los demás servicios.
 
-## 7. Resultados de la implementación
+## 8. Resultados de la implementación
 
 La implementación permitió configurar y verificar los servicios principales de infraestructura requeridos:
 
@@ -587,10 +677,11 @@ La implementación permitió configurar y verificar los servicios principales de
 - **CUPS:** se verificó el servicio, se ajustó su configuración para permitir el acceso desde la red local, se comprobó la disponibilidad de la interfaz web y se accedió al panel de administración.
 - **CUPS-PDF:** se instaló el controlador de impresión virtual, se envió un documento de prueba a la cola `PDF` y se verificó la finalización del trabajo y la generación del archivo PDF.
 - **NFS (Network File System):** se instaló y habilitó `nfs-kernel-server`, se exportó el directorio corporativo `/srv/nfs/empresa` con parámetros `(rw,sync,no_root_squash)`, se ejecutó el montaje exitoso desde un cliente Linux con `nfs-common` en `/mnt/empresa` y se validó la persistencia y control de concurrencia de lectura y escritura para reportes y auditorías de Bavaria.
+- **NIS:** se configuró el servidor maestro `nis-server` y un cliente `nis-client` para el dominio `bavaria.local`. Se verificó la resolución de usuarios y grupos, el inicio de sesión local y remoto, y la propagación de un usuario nuevo al cliente tras regenerar los mapas. Requiere pocos recursos y no licencias adicionales, pero su uso se limita por las debilidades de seguridad del protocolo.
 
 Los resultados corresponden al entorno académico de laboratorio. No se afirma que estos servicios estén desplegados en la infraestructura productiva de Bavaria ni que la organización utilice el direccionamiento presentado.
 
-## 8. Archivos y evidencias del repositorio
+## 9. Archivos y evidencias del repositorio
 
 La documentación se apoya en la siguiente organización de archivos:
 
@@ -600,17 +691,23 @@ La documentación se apoya en la siguiente organización de archivos:
 | `capturas/ntp/` | Evidencias de instalación, configuración y pruebas de Chrony. |
 | `capturas/cups/` | Evidencias de configuración, acceso y administración de CUPS. |
 | `capturas/nfs/` | Evidencias de instalación, configuración, montaje y pruebas de permisos de NFS. |
+| `capturas/nis/` | Evidencias de configuración del servidor y cliente NIS, autenticación y propagación de usuarios. |
 | `codigo/chrony.conf` | Archivo de configuración de Chrony utilizado como referencia del proyecto. |
 | `codigo/cupsd.conf` | Archivo de configuración de CUPS documentado para el laboratorio. |
 | `codigo/cups-pdf.conf` | Archivo relacionado con la configuración de CUPS-PDF, si se conserva en el repositorio. |
 | `codigo/nfs/exports` | Archivo de configuración oficial de exportación NFS documentado para el laboratorio. |
+| `codigo/nis/servidor/` | Configuración de dominio, `yp.conf`, `ypserv.securenets`, Makefile y red del servidor NIS. |
+| `codigo/nis/cliente/` | Configuración de dominio, `yp.conf`, `nsswitch.conf` y red del cliente NIS. |
+| `codigo/nis/{servidor,cliente}/00-installer-config.yaml` | Configuración de red de Netplan para las máquinas NIS. |
 | `README.md` | Presentación general y alcance del proyecto. |
 | `analisis.md` | Contexto, necesidades consideradas y diseño de los servicios. |
 
-## 9. Consideraciones de seguridad y alcance
+## 10. Consideraciones de seguridad y alcance
 
 - La regla `allow 192.168.18.0/24` de Chrony y las reglas `Allow from 192.168.18.0/24` de CUPS corresponden a la red de laboratorio. Deben ajustarse antes de reutilizar la configuración en otra red.
 - En NFS, la directiva `no_root_squash` se empleó según los requisitos de la guía académica para simplificar pruebas de laboratorio; en una red productiva de Bavaria debe utilizarse `root_squash` y mapeo restringido (`anonuid`/`anongid`) para prevenir elevación de privilegios no autorizada.
+- NIS transmite consultas sin cifrar, incluidos los hashes de contraseña. El acceso se limitó a la red de laboratorio mediante `securenets`; no debe exponerse a redes no confiables. Para un entorno real conviene evaluar alternativas con cifrado y controles más robustos, como LDAP o FreeIPA.
+- La red `192.168.1.0/24` autorizada por `securenets` y las contraseñas NIS utilizadas son exclusivas del laboratorio; deben ajustarse la red y las credenciales antes de cualquier reutilización. Los UID/GID del sistema `nobody`/`nogroup` pueden aparecer en los mapas por superar el umbral configurado; no son cuentas interactivas. Los directorios personales NIS se crean localmente en cada cliente y compartirlos requeriría NFS.
 - El acceso a la interfaz web de CUPS no implica que todas las operaciones administrativas estén abiertas. Las acciones de administración deben conservar autenticación y autorización.
 - La advertencia del navegador sobre el certificado HTTPS debe resolverse mediante un certificado confiable si el servicio se utiliza en un entorno real.
 - CUPS-PDF es una impresora virtual y no sustituye la validación de una impresora física.
