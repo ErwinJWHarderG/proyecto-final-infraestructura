@@ -1,0 +1,195 @@
+:root {
+  --azul: #0c477a;
+  --azul-oscuro: #072c50;
+  --celeste: #eaf5fc;
+  --texto: #26384a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--texto);
+  background: white;
+}
+
+.contenedor {
+  width: min(1100px, 90%);
+  margin: auto;
+}
+
+.encabezado {
+  background: white;
+  border-bottom: 1px solid #e5edf4;
+  padding: 18px 0;
+}
+
+.barra, .marca, nav {
+  display: flex;
+  align-items: center;
+}
+
+.barra {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.marca {
+  gap: 12px;
+  color: var(--azul);
+}
+
+.marca strong, .marca small {
+  display: block;
+}
+
+.marca small {
+  margin-top: 4px;
+  color: #68798b;
+}
+
+.simbolo {
+  font-size: 35px;
+}
+
+nav {
+  gap: 24px;
+}
+
+nav a {
+  color: var(--azul);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.portada {
+  padding: 105px 0;
+  color: white;
+  background: linear-gradient(125deg, #072c50, #0c6593);
+}
+
+.etiqueta, .subtitulo {
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.portada h1 {
+  max-width: 720px;
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: 1.15;
+  margin: 20px 0;
+}
+
+.portada p {
+  max-width: 580px;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.boton {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 14px 22px;
+  border-radius: 8px;
+  background: white;
+  color: var(--azul);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.seccion {
+  padding: 75px 0;
+}
+
+.seccion h2, .franja h2 {
+  font-size: 32px;
+  color: var(--azul-oscuro);
+}
+
+.subtitulo {
+  color: #1685b5;
+}
+
+.descripcion {
+  max-width: 720px;
+  line-height: 1.8;
+  color: #647487;
+}
+
+.fondo {
+  background: var(--celeste);
+}
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px;
+  margin-top: 35px;
+}
+
+.tarjeta {
+  background: white;
+  border-radius: 14px;
+  padding: 30px;
+  box-shadow: 0 8px 25px #153a5a12;
+}
+
+.tarjeta .icono {
+  font-size: 33px;
+}
+
+.tarjeta h3 {
+  color: var(--azul);
+}
+
+.tarjeta p {
+  line-height: 1.7;
+  color: #647487;
+}
+
+.franja {
+  background: var(--azul-oscuro);
+  color: white;
+  text-align: center;
+  padding: 50px 0;
+}
+
+.franja h2 {
+  color: white;
+}
+
+footer {
+  padding: 30px 0;
+  text-align: center;
+  background: #f7fafc;
+}
+
+footer small {
+  color: #738294;
+}
+
+@media (max-width: 700px) {
+  .barra {
+    flex-direction: column;
+  }
+
+  nav {
+    gap: 15px;
+  }
+
+  .portada {
+    padding: 65px 0;
+  }
+
+  .tarjetas {
+    grid-template-columns: 1fr;
+  }
+}
