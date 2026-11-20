@@ -995,6 +995,437 @@ Esta verificación confirmó que los archivos creados desde el cliente macOS fue
 
 **Resultado:** se implementó y verificó el servicio Samba en el servidor Ubuntu, habilitando el acceso autenticado al recurso compartido `Compartido` desde un equipo macOS. Las pruebas realizadas permitieron confirmar la conectividad, la autenticación del usuario, la creación de directorios y la transferencia de archivos entre el cliente y el servidor.
 
+## Servicio Dokploy: plataforma de despliegue de aplicaciones — Bavaria
+
+**Proyecto:** Administración de Infraestructura de TI — Bavaria  
+**Servicio documentado:** Dokploy, con Docker Swarm, Traefik, aplicaciones web, bases de datos y Docker Compose  
+**Entorno de implementación:** Ubuntu Server 24.04.5 LTS en una máquina virtual Multipass  
+**Alcance:** Configuración y validación técnica de Dokploy en un entorno de infraestructura de TI para el proyecto Bavaria. Se mantienen los identificadores técnicos configurados en los servicios para que los comandos y las evidencias coincidan.
+
+### Objetivo y justificación
+
+Para la infraestructura de TI de Bavaria se configuró Dokploy como plataforma de administración de aplicaciones y contenedores en el entorno de desarrollo y pruebas. Su propósito es centralizar despliegues, facilitar la gestión de servicios de datos, consultar métricas y simplificar las tareas de administración. La validación documentada corresponde al entorno técnico configurado para el proyecto.
+
+### Arquitectura y requisitos comprobados
+
+| Recurso | Configuración utilizada | Función |
+| --- | --- | --- |
+| Sistema operativo | Ubuntu Server 24.04.5 LTS | Servidor Linux |
+| Virtualización | Multipass | Servidor virtual |
+| Procesamiento | 2 vCPU | Ejecución del servidor y sus contenedores |
+| Memoria RAM | 4 GB asignados | Operación de Dokploy y servicios |
+| Disco virtual | 35 GB asignados | Almacenamiento del sistema y contenedores |
+| Dirección IPv4 del servidor virtual | `172.29.83.1` | Acceso al panel desde el equipo anfitrión |
+| Kernel | `6.8.0-147-generic` | Plataforma Linux |
+| Puertos del panel/proxy | TCP `3000`, `80`, `443` | Administración de Dokploy y enrutamiento HTTP/HTTPS |
+
+**Direccionamiento:** Se utilizó `172.29.83.1` para acceder al entorno virtual de Dokploy. Esta dirección corresponde a su configuración de red y debe distinguirse de las direcciones utilizadas por otros servicios del proyecto.
+
+### 1. Preparación del servidor e instalación de Dokploy
+
+Se comprobó que la máquina virtual tuviera una versión compatible de Ubuntu, memoria y almacenamiento disponibles y puertos de red libres antes de instalar la plataforma. Estos controles son importantes en una infraestructura empresarial, porque evitan comenzar el despliegue sobre un servidor sin recursos suficientes o con conflictos de puertos.
+
+```bash
+cat /etc/os-release | grep VERSION
+free -h
+df -h
+uname -r
+sudo ss -tlnp | grep -E ':80|:443|:3000'
+```
+
+La verificación registró Ubuntu 24.04.5 LTS, aproximadamente 3,8 GiB de memoria reconocida y puertos 80, 443 y 3000 sin procesos en escucha antes de instalar Dokploy.
+
+**Evidencias de validación de requisitos:**
+
+![Figura 1. Verificación de la versión del sistema operativo Ubuntu 24.04 LTS](./capturas/dokploy/001-pagina-03.png)
+
+*Figura 1. Verificación de la versión del sistema operativo Ubuntu 24.04 LTS.*
+
+![Figura 2. Comprobación de memoria RAM disponible con el comando free -h](./capturas/dokploy/002-pagina-03.png)
+
+*Figura 2. Comprobación de memoria RAM disponible con el comando free -h.*
+
+![Figura 3. Evaluación de almacenamiento en disco con el comando df -h](./capturas/dokploy/003-pagina-04.png)
+
+*Figura 3. Evaluación de almacenamiento en disco con el comando df -h.*
+
+![Figura 4. Verificación del kernel Linux mediante uname -r](./capturas/dokploy/004-pagina-04.png)
+
+*Figura 4. Verificación del kernel Linux mediante uname -r.*
+
+![Figura 5. Verificación de puertos 80, 443 y 3000 totalmente libres](./capturas/dokploy/005-pagina-04.png)
+
+*Figura 5. Verificación de puertos 80, 443 y 3000 totalmente libres.*
+
+Para instalar la plataforma se utilizó el script oficial de instalación de Dokploy:
+
+```bash
+curl -sSL https://dokploy.com/install.sh | sh
+```
+
+Durante la instalación, el script preparó Docker Engine, Docker Swarm, la red interna de los servicios, PostgreSQL para la plataforma, el panel de Dokploy y Traefik como proxy inverso. Después se verificó la ejecución de los contenedores y la disponibilidad de los puertos.
+
+```bash
+docker ps
+sudo ss -tlnp | grep -E ':80|:443|:3000'
+```
+
+**Evidencias de instalación y verificación:**
+
+![Figura 6. Ejecución del script oficial de instalación de Dokploy](./capturas/dokploy/006-pagina-04.png)
+
+*Figura 6. Ejecución del script oficial de instalación de Dokploy.*
+
+![Figura 7. Comprobación del contenedor dokploy en estado Up con docker ps](./capturas/dokploy/007-pagina-05.png)
+
+*Figura 7. Comprobación del contenedor dokploy en estado Up con docker ps.*
+
+![Figura 8. Comprobación del contenedor dokploy-traefik activo con docker ps](./capturas/dokploy/008-pagina-05.png)
+
+*Figura 8. Comprobación del contenedor dokploy-traefik activo con docker ps.*
+
+![Figura 9. Puertos 80, 443 y 3000 en escucha mediante sudo ss -tlnp](./capturas/dokploy/009-pagina-05.png)
+
+*Figura 9. Puertos 80, 443 y 3000 en escucha mediante sudo ss -tlnp.*
+
+![Figura 10. Tabla consolidada de servicios Docker y sus puertos asociados](./capturas/dokploy/010-pagina-05.png)
+
+*Figura 10. Tabla consolidada de servicios Docker y sus puertos asociados.*
+
+El panel se consultó en `http://172.29.83.1:3000` desde el equipo anfitrión y se completó el asistente inicial para crear la cuenta administradora. Las capturas del formulario se conservan como evidencia del procedimiento, sin publicar credenciales en texto.
+
+**Evidencias del acceso inicial:**
+
+![Figura 11. Pantalla inicial de bienvenida y configuración de servidor en Dokploy](./capturas/dokploy/011-pagina-06.png)
+
+*Figura 11. Pantalla inicial de bienvenida y configuración de servidor en Dokploy.*
+
+![Figura 12. Diligenciamiento del formulario de registro del administrador](./capturas/dokploy/012-pagina-06.png)
+
+*Figura 12. Diligenciamiento del formulario de registro del administrador.*
+
+### 2. Exploración de la plataforma y preparación del proyecto Git
+
+Dokploy dispone de áreas para administrar proyectos, despliegues, contenedores, dominios gestionados por Traefik, métricas, respaldos y notificaciones. Estas funciones facilitan el seguimiento centralizado de las aplicaciones y servicios de la infraestructura de Bavaria.
+
+Se exploró el panel de administración y se preparó una aplicación Node.js con Express para validar los despliegues de servicios web. La aplicación expone las rutas `/`, `/health` y `/info` y utiliza `package.json`, `src/index.js`, `.env` y `.dockerignore`. Para las pruebas de integración con Git se utilizó el repositorio `https://github.com/Alilopez12/dokploy-practica.git`.
+
+**Evidencias del panel de administración:**
+
+![Figura 13. Pantalla de bienvenida y asistente inicial del panel Dokploy](./capturas/dokploy/013-pagina-08.png)
+
+*Figura 13. Pantalla de bienvenida y asistente inicial del panel Dokploy.*
+
+![Figura 14. Vista principal de gestión de proyectos dentro de Dokploy](./capturas/dokploy/014-pagina-08.png)
+
+*Figura 14. Vista principal de gestión de proyectos dentro de Dokploy.*
+
+Se utilizó Git para inicializar y publicar el código de prueba. Durante la configuración se presentó una incidencia porque la rama inicial quedó con el nombre `master` mientras que Dokploy buscaba `main`. El problema se resolvió renombrando y publicando la rama correcta.
+
+```bash
+git init
+git add .
+git commit -m "commit inicial"
+git branch -M main
+git push -u origin main
+```
+
+También se utilizó GitHub CLI para crear y vincular el repositorio. Los comandos documentan el flujo de publicación, y los archivos `.env` con credenciales deben excluirse de los repositorios públicos.
+
+**Evidencias de versionamiento:**
+
+![Figura 15. Inicialización del repositorio Git local mediante git init](./capturas/dokploy/015-pagina-09.png)
+
+*Figura 15. Inicialización del repositorio Git local mediante git init.*
+
+![Figura 16. Confirmación inicial de los archivos del proyecto con git commit](./capturas/dokploy/016-pagina-09.png)
+
+*Figura 16. Confirmación inicial de los archivos del proyecto con git commit.*
+
+![Figura 17. Creación y vinculación del repositorio en GitHub mediante gh repo create y git push](./capturas/dokploy/017-pagina-09.png)
+
+*Figura 17. Creación y vinculación del repositorio en GitHub mediante gh repo create y git push.*
+
+![Figura 18. Resolución: Publicación de la rama main hacia el repositorio GitHub](./capturas/dokploy/018-pagina-10.png)
+
+*Figura 18. Resolución: Publicación de la rama main hacia el repositorio GitHub.*
+
+### 3. Despliegue de la aplicación web con Dokploy y Nixpacks
+
+Para comprobar el despliegue de aplicaciones de la infraestructura de Bavaria se configuró en Dokploy un proyecto de validación identificado como `uni-quindio`, con la aplicación `webapp-uni-quindio`. Estos son los nombres técnicos del servicio configurado y permiten identificarlo en las verificaciones y capturas.
+
+Se seleccionó el proveedor Git, la rama `main`, la ruta raíz `/` y el constructor Nixpacks, que detecta las dependencias de la aplicación a partir del repositorio. Luego se ejecutó el despliegue desde el panel y se consultaron los contenedores activos.
+
+**Evidencias de creación y configuración del servicio:**
+
+![Figura 19. Confirmación de creación del proyecto uni-quindio](./capturas/dokploy/019-pagina-10.png)
+
+*Figura 19. Confirmación de creación del proyecto uni-quindio.*
+
+![Figura 20. Menú de selección de tipo de servicio (Application, Database, Compose)](./capturas/dokploy/020-pagina-11.png)
+
+*Figura 20. Menú de selección de tipo de servicio (Application, Database, Compose).*
+
+![Figura 21. Formulario diligenciado para la creación de webapp-uni-quindio](./capturas/dokploy/021-pagina-11.png)
+
+*Figura 21. Formulario diligenciado para la creación de webapp-uni-quindio.*
+
+![Figura 22. Panel de configuración general del servicio webapp-uni-quindio](./capturas/dokploy/022-pagina-12.png)
+
+*Figura 22. Panel de configuración general del servicio webapp-uni-quindio.*
+
+![Figura 23. Selección del proveedor Git dentro del panel de la aplicación](./capturas/dokploy/023-pagina-13.png)
+
+*Figura 23. Selección del proveedor Git dentro del panel de la aplicación.*
+
+![Figura 24. Configuración completa del repositorio GitHub y motor Nixpacks](./capturas/dokploy/024-pagina-13.png)
+
+*Figura 24. Configuración completa del repositorio GitHub y motor Nixpacks.*
+
+![Figura 25. Modal de confirmación de despliegue en Dokploy](./capturas/dokploy/025-pagina-14.png)
+
+*Figura 25. Modal de confirmación de despliegue en Dokploy.*
+
+![Figura 26. Registro de compilación de la imagen mediante Nixpacks](./capturas/dokploy/026-pagina-14.png)
+
+*Figura 26. Registro de compilación de la imagen mediante Nixpacks.*
+
+![Figura 27. Verificación en terminal del contenedor webapp activo mediante docker ps](./capturas/dokploy/027-pagina-15.png)
+
+*Figura 27. Verificación en terminal del contenedor webapp activo mediante docker ps.*
+
+#### Dominio local, rutas y verificaciones HTTP
+
+La aplicación se configuró con la dirección de acceso de pruebas `webapp-uni-quindio.traefik.me`, dirigida al puerto interno 3000 mediante Traefik. Las capturas permiten verificar el enrutamiento HTTP, sin acreditar por sí solas la emisión de un certificado HTTPS válido.
+
+Para comprobar que el servicio atendía solicitudes, se consultaron las rutas principales:
+
+```bash
+curl http://webapp-uni-quindio.traefik.me/
+curl http://webapp-uni-quindio.traefik.me/health
+curl http://webapp-uni-quindio.traefik.me/info
+```
+
+Las verificaciones registran respuestas de la API en formato JSON y comprobaciones del estado de la aplicación. También se configuraron variables de entorno de ejecución como `NODE_ENV`, `PORT`, `APP_NAME` y `APP_VERSION`. Estas variables permiten parametrizar el servicio desplegado para las pruebas del proyecto.
+
+**Evidencias del dominio, las pruebas y las variables:**
+
+![Figura 28. Pestaña Domains previo a la configuración del dominio](./capturas/dokploy/028-pagina-15.png)
+
+*Figura 28. Pestaña Domains previo a la configuración del dominio.*
+
+![Figura 29. Asignación del dominio webapp-uni-quindio.traefik.me en puerto 3000](./capturas/dokploy/029-pagina-16.png)
+
+*Figura 29. Asignación del dominio webapp-uni-quindio.traefik.me en puerto 3000.*
+
+![Figura 30. Dominio activo y enrutado dinámicamente por Traefik](./capturas/dokploy/030-pagina-16.png)
+
+*Figura 30. Dominio activo y enrutado dinámicamente por Traefik.*
+
+![Figura 31. Prueba HTTP con curl al endpoint raíz (/), respondiendo mensaje institucional en JSON](./capturas/dokploy/031-pagina-17.png)
+
+*Figura 31. Prueba HTTP con curl al endpoint raíz (/), respondiendo mensaje institucional en JSON.*
+
+![Figura 32. Prueba HTTP con curl a /health, reportando estado saludable y versión](./capturas/dokploy/032-pagina-17.png)
+
+*Figura 32. Prueba HTTP con curl a /health, reportando estado saludable y versión.*
+
+![Figura 33. Prueba HTTP con curl a /info, exponiendo arquitectura, SO y memoria](./capturas/dokploy/033-pagina-17.png)
+
+*Figura 33. Prueba HTTP con curl a /info, exponiendo arquitectura, SO y memoria.*
+
+![Figura 34. Variables de entorno guardadas y aplicadas satisfactoriamente](./capturas/dokploy/034-pagina-17.png)
+
+*Figura 34. Variables de entorno guardadas y aplicadas satisfactoriamente.*
+
+### 4. Administración de bases de datos en Dokploy
+
+Para validar la administración centralizada de datos en la infraestructura de Bavaria, se aprovisionaron tres servicios dentro de Dokploy: MySQL 8.0 (`db-uni-quindio`), PostgreSQL 16 (`db-postgres-quindio`) y Redis 7 (`redis-cache-quindio`). Las capturas muestran los formularios de creación, el estado de los servicios y la revisión de los recursos asociados.
+
+| Servicio | Tecnología | Función en la infraestructura de Bavaria |
+| --- | --- | --- |
+| `db-uni-quindio` | MySQL 8.0 | Datos relacionales de aplicaciones administrativas |
+| `db-postgres-quindio` | PostgreSQL 16 | Datos relacionales y consultas analíticas |
+| `redis-cache-quindio` | Redis 7 | Caché para reducir consultas repetidas |
+
+Los motores se implementaron como servicios de prueba para operaciones de almacenamiento, consultas y caché. No deben publicarse las credenciales de administración.
+
+**Evidencias de creación de motores:**
+
+![Figura 35. Catálogo de motores de bases de datos disponibles en Dokploy](./capturas/dokploy/035-pagina-18.png)
+
+*Figura 35. Catálogo de motores de bases de datos disponibles en Dokploy.*
+
+![Figura 36. Configuración de credenciales de la base de datos MySQL 8.0](./capturas/dokploy/036-pagina-19.png)
+
+*Figura 36. Configuración de credenciales de la base de datos MySQL 8.0.*
+
+![Figura 37. Configuración de credenciales de la base de datos PostgreSQL 16](./capturas/dokploy/037-pagina-19.png)
+
+*Figura 37. Configuración de credenciales de la base de datos PostgreSQL 16.*
+
+![Figura 38. Configuración de contraseña de la base de datos Redis 7](./capturas/dokploy/038-pagina-20.png)
+
+*Figura 38. Configuración de contraseña de la base de datos Redis 7.*
+
+![Figura 39. Panel del proyecto uni-quindio con todas las bases de datos registradas](./capturas/dokploy/039-pagina-20.png)
+
+*Figura 39. Panel del proyecto uni-quindio con todas las bases de datos registradas.*
+
+Posteriormente se comprobó que los contenedores de bases de datos estuvieran en ejecución y conectados a la red interna de Docker Swarm. La configuración de la aplicación incluyó variables para la conexión a MySQL y la consulta de métricas en el panel de Dokploy.
+
+```bash
+docker ps | grep -E 'mysql|postgres|redis'
+docker network ls
+```
+
+**Evidencias de comprobación y conexión:**
+
+![Figura 40. Verificación con docker ps | grep -E 'mysql|postgres|redis'](./capturas/dokploy/040-pagina-21.png)
+
+*Figura 40. Verificación con docker ps | grep -E 'mysql|postgres|redis'.*
+
+![Figura 41. Verificación de la red overlay swarm mediante docker network ls](./capturas/dokploy/041-pagina-21.png)
+
+*Figura 41. Verificación de la red overlay swarm mediante docker network ls.*
+
+![Figura 42. Pestaña Monitoring de la base de datos MySQL en Dokploy](./capturas/dokploy/042-pagina-22.png)
+
+*Figura 42. Pestaña Monitoring de la base de datos MySQL en Dokploy.*
+
+![Figura 43. Inyección de variables de conexión a MySQL dentro de webapp-uni-quindio](./capturas/dokploy/043-pagina-22.png)
+
+*Figura 43. Inyección de variables de conexión a MySQL dentro de webapp-uni-quindio.*
+
+### 5. Despliegue de servicios relacionados con Docker Compose
+
+Para comprobar el manejo de múltiples servicios desde Dokploy se creó el proyecto `multi-service`, con un recurso Compose denominado `compose-stack`. Incluyó una aplicación web en Node.js, MongoDB, MySQL y phpMyAdmin, en un entorno de servicios integrados para la plataforma empresarial.
+
+| Componente | Función |
+| --- | --- |
+| `compose-webapp` | Servicio web con Node.js |
+| `compose-mongo` | Base de datos documental MongoDB 7 |
+| `compose-mysql` | Base de datos relacional MySQL 8.0 |
+| `compose-phpmyadmin` | Interfaz de administración de MySQL |
+
+Se configuró el archivo `docker-compose.yml`, se inició el stack y se revisaron los contenedores y sus registros. Cuando Dokploy mostró el error `Github Provider not found` en el proveedor GitHub, se resolvió usando el proveedor Git estándar, apuntando al repositorio en la rama `main` y a la ruta `./docker-compose.yml`. Este hecho se documenta porque muestra una dificultad real resuelta durante la configuración.
+
+**Evidencias del stack Compose:**
+
+![Figura 44. Creación del proyecto multi-service en Dokploy](./capturas/dokploy/044-pagina-23.png)
+
+*Figura 44. Creación del proyecto multi-service en Dokploy.*
+
+![Figura 45. Formulario de creación del servicio Compose compose-stack](./capturas/dokploy/045-pagina-24.png)
+
+*Figura 45. Formulario de creación del servicio Compose compose-stack.*
+
+![Figura 46. Editor de manifiesto docker-compose.yml en Dokploy](./capturas/dokploy/046-pagina-24.png)
+
+*Figura 46. Editor de manifiesto docker-compose.yml en Dokploy.*
+
+![Figura 47. Verificación en terminal de los 4 contenedores del compose mediante docker ps](./capturas/dokploy/047-pagina-25.png)
+
+*Figura 47. Verificación en terminal de los 4 contenedores del compose mediante docker ps.*
+
+![Figura 48. Comprobación de logs de arranque del contenedor compose-mysql](./capturas/dokploy/048-pagina-25.png)
+
+*Figura 48. Comprobación de logs de arranque del contenedor compose-mysql.*
+
+![Figura 49. Comprobación de logs del servicio compose-phpmyadmin](./capturas/dokploy/049-pagina-25.png)
+
+*Figura 49. Comprobación de logs del servicio compose-phpmyadmin.*
+
+![Figura 50. Pestaña Containers en Dokploy mostrando el estado del stack Compose](./capturas/dokploy/050-pagina-26.png)
+
+*Figura 50. Pestaña Containers en Dokploy mostrando el estado del stack Compose.*
+
+### 6. Monitoreo, registros y respaldo
+
+En un escenario de operación de infraestructura para Bavaria, revisar el consumo de recursos y los logs facilita detectar fallas, analizar la carga del servidor y planear medidas de mantenimiento. Se inspeccionó el monitoreo de Dokploy y se ejecutaron consultas de recursos con Docker:
+
+```bash
+docker stats
+docker system df
+docker logs -f webapp-uni-quindio
+docker logs --timestamps webapp-uni-quindio
+```
+
+Los comandos de registros deben utilizar el nombre o identificador que realmente tenga el contenedor en el entorno correspondiente. Estas consultas permiten observar ejecución y uso de recursos, pero no equivalen a un sistema completo de alertas.
+
+**Evidencias de monitoreo y logs:**
+
+![Figura 51. Panel de Monitoreo del Servidor: Gráficos de CPU, Memoria RAM y Red](./capturas/dokploy/051-pagina-27.png)
+
+*Figura 51. Panel de Monitoreo del Servidor: Gráficos de CPU, Memoria RAM y Red.*
+
+![Figura 52. Ejecución de docker stats en consola mostrando el consumo por contenedor](./capturas/dokploy/052-pagina-28.png)
+
+*Figura 52. Ejecución de docker stats en consola mostrando el consumo por contenedor.*
+
+![Figura 53. Ejecución de docker system df para auditar el uso de disco de imágenes y volúmenes](./capturas/dokploy/053-pagina-28.png)
+
+*Figura 53. Ejecución de docker system df para auditar el uso de disco de imágenes y volúmenes.*
+
+![Figura 54. Consulta de logs de la aplicación mediante docker logs -f](./capturas/dokploy/054-pagina-28.png)
+
+*Figura 54. Consulta de logs de la aplicación mediante docker logs -f.*
+
+![Figura 55. Consulta de logs con marcas de tiempo mediante docker logs --timestamps](./capturas/dokploy/055-pagina-28.png)
+
+*Figura 55. Consulta de logs con marcas de tiempo mediante docker logs --timestamps.*
+
+El informe también muestra las pantallas de configuración de destinos de respaldo S3, notificaciones y copias de seguridad de bases de datos. **Estas imágenes documentan la exploración de la interfaz; no confirman que se haya creado un destino S3, activado un canal de notificación ni ejecutado una copia de seguridad exitosa.**
+
+**Evidencias de opciones de respaldo y notificaciones:**
+
+![Figura 56. Configuración de destino S3 Destinations para almacenamiento seguro de backups](./capturas/dokploy/056-pagina-29.png)
+
+*Figura 56. Configuración de destino S3 Destinations para almacenamiento seguro de backups.*
+
+![Figura 57. Configuración de canales de alerta (Discord, Slack, Telegram, Email)](./capturas/dokploy/057-pagina-29.png)
+
+*Figura 57. Configuración de canales de alerta (Discord, Slack, Telegram, Email).*
+
+![Figura 58. Pestaña Backups en la base de datos MySQL para programar copias periódicas](./capturas/dokploy/058-pagina-30.png)
+
+*Figura 58. Pestaña Backups en la base de datos MySQL para programar copias periódicas.*
+
+### 7. Integración con Git y validación del redespliegue
+
+La última verificación consistió en modificar la versión de la API a `2.0.0`, hacer commit y publicar el cambio en la rama `main`. El evento desencadenó una nueva compilación y despliegue por Dokploy, y después se verificaron las respuestas actualizadas de la aplicación.
+
+```bash
+git add .
+git commit -m "v2.0.0 - Auto deploy test"
+git push origin main
+```
+
+Este flujo permite verificar la actualización del código desde Git y el despliegue de la versión modificada mediante Dokploy. Antes de aplicarlo sobre otro repositorio se deben revisar los archivos modificados y las políticas de colaboración.
+
+**Evidencias del commit y verificación de la versión:**
+
+![Figura 59. Confirmación y push del cambio a versión 2.0.0 hacia el repositorio GitHub](./capturas/dokploy/059-pagina-30.png)
+
+*Figura 59. Confirmación y push del cambio a versión 2.0.0 hacia el repositorio GitHub.*
+
+![Figura 60. Prueba con curl a la URL pública demostrando la respuesta actualizada de la versión 2.0.0](./capturas/dokploy/060-pagina-31.png)
+
+*Figura 60. Prueba con curl a la URL pública demostrando la respuesta actualizada de la versión 2.0.0.*
+
+![Figura 61. Comprobación del endpoint /health respondiendo version: '2.0.0'](./capturas/dokploy/061-pagina-31.png)
+
+*Figura 61. Comprobación del endpoint /health respondiendo version: '2.0.0'.*
+
+### 8. Resultados de Dokploy para la infraestructura de Bavaria
+
+La configuración de Dokploy permitió verificar la administración del panel, el despliegue de una aplicación con Nixpacks, la creación de bases de datos MySQL, PostgreSQL y Redis, el funcionamiento de un stack con Docker Compose, la inspección de métricas y registros y la actualización del servicio mediante Git. Esto documenta las funciones de la plataforma utilizadas para administrar la infraestructura de aplicaciones del proyecto Bavaria.
+
+**Alcance de las verificaciones:** Las pruebas se ejecutaron sobre el servidor virtual de Dokploy. No se documentan aquí una integración operativa con NFS, NTP, NIS, CUPS o Samba, una configuración de dominio corporativo, la validación de certificados HTTPS ni la ejecución completa de copias de seguridad. Estas tareas requieren evidencias independientes.
+
+**Archivos de evidencia:** Se adjuntan 61 capturas de configuración, pruebas y comprobaciones en `capturas/dokploy/`, enlazadas en orden cronológico.
+
+
 ## 8. Parámetros técnicos de los servicios
 
 | Servicio | Dirección / recurso | Puerto | Protocolo | Función |
