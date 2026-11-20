@@ -4,7 +4,7 @@
 
 Este proyecto académico aborda la configuración de servicios de infraestructura de TI tomando como contexto organizacional a **Bavaria**, empresa del sector de bebidas. El propósito es documentar una solución de laboratorio basada en Ubuntu Server 24.04 LTS que permita centralizar servicios de red y apoyar tareas de administración tecnológica.
 
-La implementación documentada comprende la sincronización de tiempo mediante Chrony, la gestión de impresión mediante CUPS (incluyendo CUPS-PDF para pruebas de impresión simulada), el almacenamiento compartido en red mediante NFS y la autenticación centralizada de usuarios mediante NIS.
+La implementación documentada comprende la sincronización de tiempo mediante Chrony, la gestión de impresión mediante CUPS (incluyendo CUPS-PDF para pruebas de impresión simulada), el almacenamiento compartido en red mediante NFS y Samba, y la autenticación centralizada de usuarios mediante NIS.
 
 > **Alcance:** La configuración se realizó en un entorno de laboratorio. Este repositorio no afirma que los servicios estén desplegados en la infraestructura productiva de Bavaria.
 
@@ -39,6 +39,10 @@ NFS (Network File System) permite centralizar y compartir directorios en red par
 
 NIS (Network Information Service) centraliza la consulta de usuarios y grupos para equipos Linux. En el laboratorio se configuró el servidor maestro `nis-server` (`192.168.1.54`) y el cliente `nis-client` (`192.168.1.55`) en el dominio `bavaria.local`; se verificó la autenticación local y por SSH, así como la propagación de usuarios nuevos. NIS transmite información sin cifrar y se documenta únicamente para el entorno académico de pruebas.
 
+### F. Compartición de archivos mediante Samba
+
+Samba permite compartir archivos y carpetas entre equipos con diferentes sistemas operativos. En el laboratorio se configuró un recurso compartido llamado `Compartido` en el servidor Ubuntu 24.04.5 LTS, utilizando la dirección IP `192.168.252.3`. Se configuró el acceso mediante usuario y contraseña, y se realizaron pruebas de conexión desde macOS utilizando Finder, verificando la creación y transferencia de archivos entre el cliente y el servidor.
+
 ## 4. Estructura del repositorio
 
 | Archivo o directorio | Descripción |
@@ -48,7 +52,9 @@ NIS (Network Information Service) centraliza la consulta de usuarios y grupos pa
 | `documentacion.md` | Procedimientos de instalación, configuración y verificación. |
 | `diagrama.mmd` | Diagrama de arquitectura de la solución. |
 | `capturas/` | Evidencias gráficas de los procedimientos y pruebas. |
+| `capturas/samba/` | Evidencias de instalación, configuración y pruebas de acceso al recurso compartido Samba. |
 | `codigo/` | Archivos de configuración y scripts relacionados con los servicios. |
+| `codigo/samba/` | Archivo de configuración del recurso compartido de Samba. |
 
 ## 5. Puertos y protocolos
 
@@ -59,11 +65,14 @@ NIS (Network Information Service) centraliza la consulta de usuarios y grupos pa
 | NFS | 2049 | TCP / UDP | Compartición de archivos en red para clientes Linux. |
 | NIS | 111 y puertos RPC dinámicos | TCP / UDP | Consulta centralizada de usuarios y grupos en clientes Linux. |
 | RPCbind | 111 | TCP / UDP | Mapeo y resolución de puertos para llamadas RPC de NFS y NIS. |
+| Samba / SMB | 445 | TCP | Compartición de archivos entre el servidor y los equipos clientes. |
 
 ## 6. Consideraciones
 
 - La dirección IP y la subred corresponden al entorno de laboratorio utilizado durante las pruebas.
 - NIS se probó en máquinas virtuales con direccionamiento distinto al de los demás servicios. No debe exponerse a redes no confiables, ya que sus consultas no están cifradas.
 - La cola `PDF` es una impresora virtual; no representa la instalación de una impresora física en Bavaria.
+- Samba se probó desde un equipo macOS mediante Finder, utilizando autenticación de usuario para acceder a la carpeta compartida.
+- La dirección IP `192.168.252.3` corresponde específicamente al servidor utilizado para las pruebas de Samba.
 - Las evidencias del repositorio respaldan los procedimientos realizados en el laboratorio.
 - Antes de trasladar esta configuración a un entorno productivo, se deben validar el direccionamiento, las políticas de acceso, la seguridad y los requerimientos reales de la organización.
