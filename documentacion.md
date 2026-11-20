@@ -651,7 +651,7 @@ Se inicializaron los mapas con `sudo /usr/lib/yp/ypinit -m` y se habilitaron `rp
 
 **Evidencia NIS-02. Instalación de NIS**
 
-![Instalación de NIS](./capturas/nis/02_instalacion_nis.png)
+![Instalación de NIS](sudo tail -40 /Library/Logs/Multipass/multipassd.log./capturas/nis/02_instalacion_nis.png)
 
 **Evidencia NIS-03. Dominio NIS y restricción de acceso**
 
@@ -720,8 +720,282 @@ También se creó en el servidor un usuario de prueba adicional y se regeneraron
 ![Propagación de usuario NIS](./capturas/nis/13_propagacion.png)
 
 ---
+## 7. Servicio de compartición de archivos mediante Samba
 
-## 7. Parámetros técnicos de los servicios
+**Objetivo:** implementar un servicio centralizado de compartición de archivos mediante Samba, permitiendo que equipos clientes con sistemas operativos diferentes accedan a un directorio compartido en el servidor Ubuntu. Para la implementación se utilizó un equipo macOS como cliente, verificando la conexión, autenticación, creación de directorios y transferencia de archivos entre el cliente y el servidor.
+
+### 7.1. Instalación del servicio Samba
+
+Se realizó la instalación del servicio Samba y de las herramientas de cliente SMB en el servidor Ubuntu 24.04 LTS. Para ello se utilizó el administrador de paquetes APT:
+
+```bash
+sudo apt install samba smbclient -y
+```
+
+El paquete `samba` proporciona los componentes necesarios para compartir archivos mediante el protocolo SMB/CIFS, mientras que `smbclient` permite consultar y probar los recursos compartidos desde la terminal.
+
+**Evidencia 001. Instalación del servicio Samba**
+
+![Instalación de Samba](./capturas/samba/001-instalacion-samba.png)
+
+### 7.2. Verificación de la instalación y de los servicios
+
+Una vez finalizada la instalación, se verificó que los paquetes `samba` y `smbclient` estuvieran instalados correctamente. También se consultó la versión del servicio y el estado de los componentes encargados de atender las conexiones SMB.
+
+Se utilizaron los siguientes comandos:
+
+```bash
+dpkg -l samba smbclient
+systemctl is-active smbd nmbd
+samba --version
+```
+
+La salida permitió comprobar que Samba se encontraba instalado, con la versión 4.19.5 de Ubuntu, y que los servicios consultados se encontraban activos.
+
+**Evidencia 002. Verificación de la instalación de Samba**
+
+![Verificación de instalación de Samba](./capturas/samba/002-verificacion-instalacion-samba.png)
+
+### 7.3. Creación del directorio compartido y asignación de permisos
+
+Se creó el directorio que sería utilizado como recurso compartido para almacenar los archivos del proyecto. Para mantener una estructura organizada, se utilizó la ruta `/srv/samba/compartido`.
+
+Posteriormente, se verificó la existencia del grupo `sambashare`, se incorporó el usuario `ubuntu` a dicho grupo y se asignaron los permisos correspondientes al directorio:
+
+```bash
+sudo mkdir -p /srv/samba/compartido
+sudo groupadd --force sambashare
+sudo usermod -aG sambashare ubuntu
+sudo chown root:sambashare /srv/samba/compartido
+sudo chmod 2770 /srv/samba/compartido
+```
+
+El grupo `sambashare` permite administrar el acceso al recurso compartido. El propietario del directorio se estableció como `root`, mientras que el grupo asignado fue `sambashare`.
+
+El permiso especial `2` incluido en `2770` corresponde al bit SGID, que permite que los archivos y directorios nuevos hereden el grupo propietario del directorio compartido. Los permisos `770` conceden lectura, escritura y ejecución al propietario y al grupo, sin otorgar acceso a otros usuarios.
+
+Finalmente, se verificaron los permisos y la pertenencia del usuario al grupo:
+
+```bash
+ls -ld /srv/samba/compartido
+id ubuntu
+```
+
+**Evidencia 003. Creación del directorio compartido y asignación de permisos**
+
+![Directorio compartido Samba](./capturas/samba/003-directorio-compartido-samba.png)
+
+### 7.4. Creación y configuración del usuario Samba
+
+Para controlar el acceso al recurso compartido se utilizó el usuario existente `ubuntu` del sistema operativo. Este usuario fue incorporado al grupo `sambashare` y posteriormente se habilitó su autenticación mediante Samba.
+
+Se ejecutaron los siguientes comandos:
+
+```bash
+sudo smbpasswd -a ubuntu
+sudo pdbedit -L
+sudo smbpasswd -e ubuntu
+```
+
+El comando `smbpasswd -a` permite registrar al usuario en la base de datos de autenticación de Samba y establecer una contraseña específica para acceder al servicio. Posteriormente, `pdbedit -L` permite consultar los usuarios registrados y `smbpasswd -e` habilita la cuenta para su utilización.
+
+La salida confirmó la incorporación del usuario `ubuntu` a la base de datos de Samba y la habilitación de su cuenta.
+
+**Evidencia 004. Creación y habilitación del usuario Samba**
+
+![Creación del usuario Samba](./capturas/samba/004-creacion-usuario-samba.png)
+
+### 7.5. Respaldo y edición del archivo de configuración de Samba
+
+Antes de modificar la configuración del servicio se realizó una copia de seguridad del archivo principal `/etc/samba/smb.conf`, con el propósito de conservar la configuración original y facilitar su recuperación ante posibles errores.
+
+Se ejecutaron los siguientes comandos:
+
+```bash
+sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.backup
+sudo nano /etc/samba/smb.conf
+```
+
+Dentro del archivo se configuraron los parámetros generales del recurso compartido, estableciendo el nombre `Compartido`, la descripción del directorio, su ubicación y las restricciones de acceso.
+
+La configuración incorporada para el recurso fue:
+
+```ini
+[Compartido]
+comment = Carpeta compartida del proyecto
+path = /srv/samba/compartido
+browseable = yes
+read only = no
+valid users = @sambashare
+force group = sambashare
+create mask = 0660
+directory mask = 02770
+```
+
+La configuración establece los siguientes parámetros:
+
+- `comment`: identifica el propósito del recurso compartido.
+- `path`: define la ubicación física del directorio en el servidor.
+- `browseable = yes`: permite que el recurso sea visible para los clientes que consultan los recursos compartidos.
+- `read only = no`: permite realizar operaciones de escritura sobre el directorio.
+- `valid users = @sambashare`: restringe el acceso a los usuarios pertenecientes al grupo `sambashare`.
+- `force group = sambashare`: establece el grupo que se utilizará para los archivos creados mediante el recurso.
+- `create mask = 0660`: establece los permisos iniciales de los archivos nuevos.
+- `directory mask = 02770`: establece los permisos iniciales de los directorios nuevos, incluyendo el bit SGID.
+
+**Evidencia 005. Respaldo y edición del archivo de configuración de Samba**
+
+![Edición de configuración Samba](./capturas/samba/005-Edición del archivo de configuración de Samba.png)
+
+**Evidencia 006. Configuración del recurso compartido en Samba**
+
+![Configuración del recurso compartido](./capturas/samba/006-Edición del archivo de configuración de Samba2.png)
+
+### 7.6. Verificación de la configuración del recurso compartido
+
+Después de realizar los cambios en el archivo `smb.conf`, se verificó que la configuración no presentara errores de sintaxis y que el recurso compartido estuviera definido correctamente.
+
+Para ello se utilizó:
+
+```bash
+testparm -s
+```
+
+La salida mostró el mensaje `Loaded services file OK`, confirmando que Samba pudo cargar correctamente el archivo de configuración.
+
+También se verificó la definición del recurso `[Compartido]`, su directorio asociado, los permisos de escritura y las restricciones de acceso mediante el grupo `sambashare`.
+
+**Evidencia 007. Verificación de la configuración del recurso compartido**
+
+![Verificación de configuración Samba](./capturas/samba/007-Verificación de la configuración del recurso compartido.png)
+
+### 7.7. Reinicio y verificación del servicio Samba
+
+Una vez validada la configuración, se reinició el servicio `smbd` para aplicar los cambios realizados en el archivo de configuración.
+
+Se ejecutaron los siguientes comandos:
+
+```bash
+sudo systemctl restart smbd
+sudo systemctl status smbd --no-pager
+```
+
+La verificación mostró que `smbd.service` se encontraba en estado `active (running)`, indicando que el servicio estaba activo y preparado para atender conexiones de los clientes.
+
+**Evidencia 008. Reinicio, verificación y estado del servicio Samba**
+
+![Estado del servicio Samba](./capturas/samba/008-Reinicio, verificación y estado del servicio Samba.png)
+
+### 7.8. Verificación de la dirección IP del servidor
+
+Para permitir la conexión desde el equipo cliente se identificó la dirección IP asignada a la máquina virtual `dokploy-server`.
+
+La dirección utilizada durante las pruebas fue:
+
+```text
+192.168.252.3
+```
+
+El servidor corresponde a una máquina virtual con Ubuntu Server 24.04.5 LTS ejecutada mediante Multipass sobre macOS.
+
+Esta dirección IP fue utilizada para establecer la comunicación entre el equipo cliente y el servidor Samba dentro de la red virtual configurada por Multipass.
+
+**Evidencia 009. Identificación de la dirección IP del servidor Samba**
+
+![Dirección IP del servidor Samba](./capturas/samba/009-ip-servidor-samba.png)
+
+### 7.9. Verificación de la conectividad y disponibilidad del recurso compartido
+
+Antes de realizar la conexión gráfica desde Finder, se verificó que Samba estuviera publicando correctamente el recurso compartido y que el puerto utilizado para las conexiones SMB estuviera disponible.
+
+Se ejecutaron los siguientes comandos:
+
+```bash
+smbclient -L localhost -U ubuntu
+nc -vz 192.168.252.3 445
+```
+
+El primer comando permitió consultar los recursos compartidos disponibles en el servidor, identificando el recurso `Compartido` junto con los recursos predeterminados de Samba.
+
+El segundo comando permitió comprobar la conectividad con el puerto TCP `445`, utilizado por SMB para establecer las conexiones de compartición de archivos.
+
+La conexión al puerto fue exitosa, confirmando que el servidor aceptaba conexiones SMB desde el equipo cliente.
+
+**Evidencia 010. Verificación de conectividad entre macOS y el servidor Samba**
+
+![Verificación de conectividad Samba](./capturas/samba/010-verificacion-conectividad-mac-samba.png)
+
+### 7.10. Conexión al recurso compartido desde macOS
+
+Para comprobar el funcionamiento del servicio desde un sistema operativo diferente a Linux, se utilizó un equipo macOS como cliente.
+
+Desde el explorador de archivos Finder se accedió a la opción de conexión a un servidor mediante la combinación de teclas `Command + K`.
+
+En la ventana de conexión se introdujo la siguiente dirección:
+
+```text
+smb://192.168.252.3/Compartido
+```
+
+Posteriormente, se seleccionó la opción de conexión y se ingresaron las credenciales del usuario `ubuntu`, utilizando la contraseña previamente configurada para Samba.
+
+Una vez autenticado, Finder permitió acceder al directorio compartido del servidor Ubuntu y visualizar su contenido.
+
+**Evidencia 011. Inicio del procedimiento de conexión al servidor Samba desde macOS**
+
+![Conexión Samba macOS](./capturas/samba/011-conexion-samba-macos.png)
+
+**Evidencia 012. Acceso al recurso compartido mediante Finder**
+
+![Acceso al recurso Samba desde macOS](./capturas/samba/012-conexion-samba-macos.png)
+
+**Evidencia 013. Visualización de la carpeta compartida en macOS**
+
+![Carpeta compartida en Finder](./capturas/samba/013-conexion-macos-carpeta-compartida.png)
+
+### 7.11. Prueba de escritura desde el cliente macOS
+
+Después de establecer la conexión con el servidor, se realizó una prueba de escritura desde Finder para verificar que el recurso compartido permitiera crear y almacenar información.
+
+Desde macOS se creó una carpeta denominada `prueba` dentro del recurso compartido `Compartido`. Posteriormente, dentro de esta carpeta se guardó un documento de prueba denominado `Sin título 2.doc`.
+
+Esta operación permitió comprobar que el cliente podía realizar modificaciones sobre el directorio compartido y que los permisos de escritura configurados en Samba funcionaban correctamente.
+
+**Evidencia 014. Verificación de escritura desde macOS en el recurso compartido**
+
+![Prueba de escritura desde macOS](./capturas/samba/014-verificacion-escritura-macos.png)
+
+### 7.12. Verificación de los archivos creados en el servidor Ubuntu
+
+Finalmente, se comprobó desde el servidor Ubuntu que los elementos creados mediante Finder estuvieran almacenados físicamente en el directorio compartido.
+
+Para ello se ejecutó el siguiente comando:
+
+```bash
+ls -l /srv/samba/compartido
+```
+
+La salida mostró el directorio `prueba`, creado previamente desde macOS. Posteriormente, se consultó su contenido mediante:
+
+```bash
+ls -l /srv/samba/compartido/prueba
+```
+
+En la salida se identificó el documento `Sin título 2.doc`, con un tamaño de 19456 bytes y perteneciente al usuario `ubuntu` y al grupo `sambashare`.
+
+Esta verificación confirmó que los archivos creados desde el cliente macOS fueron almacenados correctamente en el servidor Ubuntu, demostrando el funcionamiento de la compartición de archivos mediante Samba.
+
+**Evidencia 015. Visualización del archivo creado desde macOS en la carpeta compartida mediante Finder**
+
+![Archivo creado desde macOS](./capturas/samba/015-Visualización del archivo creado desde macOS en la carpeta compartida mediante Finder.png)
+
+**Evidencia 016. Verificación de creación del archivo desde macOS en el directorio compartido del servidor Samba**
+
+![Verificación de archivo en el servidor Samba](./capturas/samba/016-Verificación de creación de archivo desde macOS en el directorio compartido del servidor Samba.png)
+
+**Resultado:** se implementó y verificó el servicio Samba en el servidor Ubuntu, habilitando el acceso autenticado al recurso compartido `Compartido` desde un equipo macOS. Las pruebas realizadas permitieron confirmar la conectividad, la autenticación del usuario, la creación de directorios y la transferencia de archivos entre el cliente y el servidor.
+
+## 8. Parámetros técnicos de los servicios
 
 | Servicio | Dirección / recurso | Puerto | Protocolo | Función |
 |---|---|---:|---|---|
@@ -730,10 +1004,11 @@ También se creó en el servidor un usuario de prueba adicional y se regeneraron
 | CUPS-PDF | Cola virtual `PDF` | — | CUPS | Conversión de trabajos de impresión a archivos PDF. |
 | NFS Server | `/srv/nfs/empresa` | 2049 / 111 | TCP / UDP | Compartición centralizada de archivos para clientes Linux de Bavaria. |
 | NIS | `bavaria.local` (`192.168.1.54` / `192.168.1.55`) | 111 y RPC dinámicos | TCP / UDP | Consulta centralizada de usuarios y grupos desde clientes Linux. |
+| Samba | `192.168.252.3` (`Compartido`) | 445 | TCP | Compartición autenticada de archivos entre Ubuntu y clientes macOS mediante SMB/CIFS. |
 
 Las direcciones IP y subredes corresponden exclusivamente a los entornos de laboratorio utilizados en las pruebas; NIS se probó en máquinas virtuales con direccionamiento distinto al de los demás servicios.
 
-## 8. Resultados de la implementación
+## 9. Resultados de la implementación
 
 La implementación permitió configurar y verificar los servicios principales de infraestructura requeridos:
 
@@ -742,10 +1017,11 @@ La implementación permitió configurar y verificar los servicios principales de
 - **CUPS-PDF:** se instaló el controlador de impresión virtual, se envió un documento de prueba a la cola `PDF` y se verificó la finalización del trabajo y la generación del archivo PDF.
 - **NFS (Network File System):** se instaló y habilitó `nfs-kernel-server`, se exportó el directorio corporativo `/srv/nfs/empresa` con parámetros `(rw,sync,no_root_squash)`, se ejecutó el montaje exitoso desde un cliente Linux con `nfs-common` en `/mnt/empresa` y se validó la persistencia y control de concurrencia de lectura y escritura para reportes y auditorías de Bavaria.
 - **NIS:** se configuró el servidor maestro `nis-server` y un cliente `nis-client` para el dominio `bavaria.local`. Se verificó la resolución de usuarios y grupos, el inicio de sesión local y remoto, y la propagación de un usuario nuevo al cliente tras regenerar los mapas. Requiere pocos recursos y no licencias adicionales, pero su uso se limita por las debilidades de seguridad del protocolo.
+- - **Samba:** se instaló y configuró el servicio de compartición de archivos en Ubuntu Server 24.04.5 LTS. Se creó el recurso compartido `Compartido`, se configuraron los permisos mediante el grupo `sambashare` y se habilitó la autenticación del usuario `ubuntu`. Se verificó la disponibilidad del puerto TCP 445 y se realizó una conexión exitosa desde macOS mediante Finder. Finalmente, se comprobó la creación de directorios y archivos desde el cliente y su persistencia en el servidor Ubuntu.
 
 Los resultados corresponden al entorno académico de laboratorio. No se afirma que estos servicios estén desplegados en la infraestructura productiva de Bavaria ni que la organización utilice el direccionamiento presentado.
 
-## 9. Archivos y evidencias del repositorio
+## 10. Archivos y evidencias del repositorio
 
 La documentación se apoya en la siguiente organización de archivos:
 
@@ -765,8 +1041,9 @@ La documentación se apoya en la siguiente organización de archivos:
 | `codigo/nis/{servidor,cliente}/00-installer-config.yaml` | Configuración de red de Netplan para las máquinas NIS. |
 | `README.md` | Presentación general y alcance del proyecto. |
 | `analisis.md` | Contexto, necesidades consideradas y diseño de los servicios. |
+| `capturas/samba/` | Evidencias de instalación, configuración, autenticación, conectividad y pruebas de escritura del servicio Samba desde macOS. |
 
-## 10. Consideraciones de seguridad y alcance
+## 11. Consideraciones de seguridad y alcance
 
 - La regla `allow 192.168.18.0/24` de Chrony y las reglas `Allow from 192.168.18.0/24` de CUPS corresponden a la red de laboratorio. Deben ajustarse antes de reutilizar la configuración en otra red.
 - En NFS, la directiva `no_root_squash` se empleó según los requisitos de la guía académica para simplificar pruebas de laboratorio; en una red productiva de Bavaria debe utilizarse `root_squash` y mapeo restringido (`anonuid`/`anongid`) para prevenir elevación de privilegios no autorizada.
@@ -776,3 +1053,4 @@ La documentación se apoya en la siguiente organización de archivos:
 - La advertencia del navegador sobre el certificado HTTPS debe resolverse mediante un certificado confiable si el servicio se utiliza en un entorno real.
 - CUPS-PDF es una impresora virtual y no sustituye la validación de una impresora física.
 - Antes de trasladar la solución a un entorno productivo de Bavaria se deben levantar los requisitos reales, validar la topología de red, definir políticas de acceso y establecer controles de seguridad, disponibilidad y respaldo.
+- - En Samba, el acceso al recurso `Compartido` se restringió mediante el grupo `sambashare` y la autenticación del usuario `ubuntu`. La configuración permite escritura a los usuarios autorizados, por lo que en un entorno productivo se deben utilizar credenciales individuales, contraseñas robustas y reglas de acceso limitadas a las redes autorizadas.
