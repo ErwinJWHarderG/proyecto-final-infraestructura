@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Portal académico de demostración de los servicios de infraestructura TI del proyecto Bavaria.">
+  <title>Bavaria | Portal de Infraestructura TI</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="encabezado">
+    <div class="contenedor barra">
+      <div class="marca"><span class="simbolo" aria-hidden="true">🍺</span><div><strong>BAVARIA</strong><small>Infraestructura de TI · Proyecto académico</small></div></div>
+      <nav aria-label="Navegación principal"><a href="#inicio">Inicio</a><a href="#servicios">Servicios</a><a href="#proyecto">Proyecto</a></nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="portada" id="inicio">
+      <div class="contenedor">
+        <span class="etiqueta">ADMINISTRACIÓN DE INFRAESTRUCTURA DE TI</span>
+        <h1>Servicios tecnológicos para una operación conectada</h1>
+        <p>Portal de demostración que reúne los servicios de infraestructura configurados en el laboratorio académico tomando a Bavaria como contexto organizacional.</p>
+        <a class="boton" href="#servicios">Consultar servicios</a>
+      </div>
+    </section>
+
+    <section class="seccion" id="proyecto">
+      <div class="contenedor">
+        <span class="subtitulo">CONTEXTO DEL PROYECTO</span>
+        <h2>Infraestructura centralizada</h2>
+        <p class="descripcion">La práctica integra servicios de sincronización horaria, impresión, almacenamiento compartido, autenticación y compartición de archivos. La implementación corresponde a un entorno de laboratorio académico y no representa una infraestructura productiva de Bavaria.</p>
+        <p class="nota">Estado de conexión: <span id="db-status" class="estado estado-pendiente">Consultando base de datos...</span></p>
+      </div>
+    </section>
+
+    <section class="seccion fondo" id="servicios">
+      <div class="contenedor">
+        <span class="subtitulo">CATÁLOGO DEL LABORATORIO</span>
+        <h2>Servicios de infraestructura</h2>
+        <p class="descripcion">La información de las tarjetas se obtiene desde la base de datos MySQL vinculada a la aplicación.</p>
+        <div id="lista" class="tarjetas" aria-live="polite"><p>Cargando servicios...</p></div>
+      </div>
+    </section>
+
+    <section class="franja"><div class="contenedor"><h2>Administración de Infraestructura de TI</h2><p>Proyecto final · Universidad del Quindío</p></div></section>
+  </main>
+
+  <footer><div class="contenedor"><small>Proyecto académico de laboratorio · Contexto organizacional: Bavaria</small></div></footer>
+
+  <script>
+    async function cargarServicios() {
+      const estado = document.getElementById('db-status');
+      const lista = document.getElementById('lista');
+      try {
+        const respuesta = await fetch('/api/servicios');
+        if (!respuesta.ok) throw new Error('La API no pudo consultar la base de datos');
+        const servicios = await respuesta.json();
+        estado.textContent = `MySQL conectada · ${servicios.length} servicios registrados`;
+        estado.className = 'estado estado-ok';
+        lista.replaceChildren();
+        servicios.forEach(servicio => {
+          const tarjeta = document.createElement('article');
+          tarjeta.className = 'tarjeta';
+          const titulo = document.createElement('h3');
+          titulo.textContent = servicio.nombre;
+          const descripcion = document.createElement('p');
+          descripcion.textContent = servicio.descripcion;
+          const detalle = document.createElement('small');
+          detalle.textContent = `${servicio.protocolo} · Puerto ${servicio.puerto} · ${servicio.estado}`;
+          tarjeta.append(titulo, descripcion, detalle);
+          lista.append(tarjeta);
+        });
+        if (servicios.length === 0) lista.textContent = 'No hay servicios registrados. Ejecute db/init.sql.';
+      } catch (error) {
+        estado.textContent = 'No se pudo conectar con MySQL';
+        estado.className = 'estado estado-error';
+        lista.textContent = 'No se pudieron cargar los servicios. Verifique la aplicación, las variables de entorno y la tabla servicios_infraestructura.';
+        console.error(error);
+      }
+    }
+    cargarServicios();
+  </script>
+</body>
+</html>

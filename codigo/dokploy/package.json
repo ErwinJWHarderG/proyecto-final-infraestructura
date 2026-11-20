@@ -1,7 +1,8 @@
 {
-  "name": "hospital-san-juan-de-dios",
+  "name": "bavaria-infraestructura-web",
   "version": "1.0.0",
-  "description": "Sitio web de demostracion del Hospital San Juan de Dios de Armenia",
+  "private": true,
+  "description": "Portal de demostración de servicios de infraestructura TI del proyecto académico Bavaria",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js"
